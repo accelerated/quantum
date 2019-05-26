@@ -21,26 +21,32 @@
 
 namespace Bloomberg {
 namespace quantum {
-
+    
 inline
 TaskQueue::TaskQueue() :
-    TaskQueue(Configuration())
+    TaskQueue(Configuration(), nullptr)
 {
 }
 
 inline
-TaskQueue::TaskQueue(const Configuration&) :
+TaskQueue::TaskQueue(const Configuration&, std::shared_ptr<TaskQueue> sharedQueue) :
     _alloc(Allocator<QueueListAllocator>::instance(AllocatorTraits::queueListAllocSize())),
     _runQueue(_alloc),
     _waitQueue(_alloc),
     _queueIt(_runQueue.end()),
     _blockedIt(_runQueue.end()),
     _isEmpty(true),
+    _isSharedQueueEmpty(true),
     _isInterrupted(false),
     _isIdle(true),
     _terminated(false),
-    _isAdvanced(false)
+    _isAdvanced(false),
+    _sharedQueue(sharedQueue)
 {
+    if (_sharedQueue)
+    {
+        _helpers.push_back(this);
+    }
     _thread = std::make_shared<std::thread>(std::bind(&TaskQueue::run, this));
 }
 
@@ -74,122 +80,58 @@ void TaskQueue::pinToCore(int coreId)
 #endif
 }
 
+
 inline
 void TaskQueue::run()
 {
-    while (true)
+    while (!isInterrupted())
     {
-        try
+        processTask();
+        if (_sharedQueue)
         {
-            if (_isEmpty)
-            {
-                _blockedIt = _runQueue.end(); //clear iterator
-                std::unique_lock<std::mutex> lock(_notEmptyMutex);
-                //========================= BLOCK WHEN EMPTY =========================
-                //Wait for the queue to have at least one element
-                _notEmptyCond.wait(lock, [this]()->bool { return !_isEmpty || _isInterrupted; });
-            }
-            
-            if (_isInterrupted)
-            {
-                break;
-            }
-            
-            //Iterate to the next runnable task
-            if (advance() == _runQueue.end())
-            {
-                continue;
-            }
-            
-            //Check if we need to pause this thread
-            if (_blockedIt == _queueIt) {
-                //All coroutines are blocked so we yield
-                YieldingThread()();
-            }
-            
-            //Process current task
-            ITaskContinuation::Ptr task = *_queueIt;
-            
-            //Check if blocked or sleeping
-            if (task->isBlocked() || task->isSleeping(true))
-            {
-                if (_blockedIt == _runQueue.end()) {
-                    _blockedIt = _queueIt;
-                }
-                continue;
-            }
-            
-            //========================= START/RESUME COROUTINE =========================
-            int rc = task->run();
-            //=========================== END/YIELD COROUTINE ==========================
-            
-            if (rc != (int)ITask::RetCode::Running) //Coroutine ended
-            {
-                //clear the blocked position iterator if it's the same as the finished task
-                if (_blockedIt == _queueIt) {
-                    _blockedIt = _runQueue.end();
-                }
-                ITaskContinuation::Ptr nextTask;
-                if (rc == (int)ITask::RetCode::Success)
-                {
-                    //Coroutine ended normally with "return 0" statement
-                    _stats.incCompletedCount();
-                    
-                    //check if there's another task scheduled to run after this one
-                    nextTask = task->getNextTask();
-                    if (nextTask && (nextTask->getType() == ITask::Type::ErrorHandler))
-                    {
-                        //skip error handler since we don't have any errors
-                        nextTask->terminate(); //invalidate the error handler
-                        nextTask = nextTask->getNextTask();
-                    }
-                }
-                else
-                {
-                    //Coroutine ended with explicit user error
-                    _stats.incErrorCount();
-                    
-#ifdef __QUANTUM_PRINT_DEBUG
-                    std::lock_guard<std::mutex> guard(Util::LogMutex());
-                    if (rc == (int)ITask::RetCode::Exception)
-                    {
-                        std::cerr << "Coroutine exited with user exception." << std::endl;
-                    }
-                    else
-                    {
-                        std::cerr << "Coroutine exited with error : " << rc << std::endl;
-                    }
-#endif
-                    //Check if we have a final task to run
-                    nextTask = task->getErrorHandlerOrFinalTask();
-                }
-                //queue next task and de-queue current one
-                enqueue(nextTask);
-                dequeue(_isIdle);
-            }
-            else if (!task->isBlocked() && !task->isSleeping()) {
-                //This coroutine will run again so we reset the blocked position iterator
-                _blockedIt = _runQueue.end();
-            }
+            _sharedQueue->processTask();
         }
-        catch (std::exception& ex)
+    }
+}
+
+inline
+bool TaskQueue::processTask()
+{
+    WorkItem workItem{nullptr, _runQueue.end()};
+    try
+    {
+        //Process a task
+        workItem = grabWorkItem();
+        TaskPtr task = workItem.first;
+        if (!task)
         {
-            UNUSED(ex);
-            dequeue(_isIdle); //remove error task
-#ifdef __QUANTUM_PRINT_DEBUG
-            std::lock_guard<std::mutex> guard(Util::LogMutex());
-            std::cerr << "Caught exception: " << ex.what() << std::endl;
-#endif
+            return false;
         }
-        catch (...)
+        //========================= START/RESUME COROUTINE =========================
+        int rc = task->run();
+        //=========================== END/YIELD COROUTINE ==========================
+        switch (rc)
         {
-            dequeue(_isIdle); //remove error task
-#ifdef __QUANTUM_PRINT_DEBUG
-            std::lock_guard<std::mutex> guard(Util::LogMutex());
-            std::cerr << "Caught unknown exception." << std::endl;
-#endif
+            case (int)ITask::RetCode::NotCallable:
+                return handleNotCallable(workItem);
+            case (int)ITask::RetCode::AlreadyResumed:
+                return handleAlreadyResumed(workItem);
+            case (int)ITask::RetCode::Running:
+                return handleRunning(workItem);
+            case (int)ITask::RetCode::Success:
+                return handleSuccess(workItem);
+            default:
+                return handleError(workItem);
         }
-    } //while(true)
+    }
+    catch (const std::exception& ex)
+    {
+        return handleException(workItem, &ex);
+    }
+    catch (...)
+    {
+        return handleException(workItem);
+    }
 }
 
 inline
@@ -200,7 +142,7 @@ void TaskQueue::enqueue(ITask::Ptr task)
         return; //nothing to do
     }
     //========================= LOCKED SCOPE =========================
-    SpinLock::Guard lock(_spinlock);
+    SpinLock::Guard lock(_waitQueueLock);
     doEnqueue(task);
 }
 
@@ -212,7 +154,7 @@ bool TaskQueue::tryEnqueue(ITask::Ptr task)
         return false; //nothing to do
     }
     //========================= LOCKED SCOPE =========================
-    SpinLock::Guard lock(_spinlock, SpinLock::TryToLock{});
+    SpinLock::Guard lock(_waitQueueLock, SpinLock::TryToLock{});
     if (lock.ownsLock())
     {
         doEnqueue(task);
@@ -253,30 +195,37 @@ void TaskQueue::doEnqueue(ITask::Ptr task)
 inline
 ITask::Ptr TaskQueue::dequeue(std::atomic_bool& hint)
 {
-    return doDequeue(hint);
+    return doDequeue(hint, _queueIt);
 }
 
 inline
 ITask::Ptr TaskQueue::tryDequeue(std::atomic_bool& hint)
 {
-    return doDequeue(hint);
+    return doDequeue(hint, _queueIt);
 }
 
 inline
-ITask::Ptr TaskQueue::doDequeue(std::atomic_bool& hint)
+ITask::Ptr TaskQueue::doDequeue(std::atomic_bool& hint, TaskListIter iter)
 {
-    hint = (_queueIt == _runQueue.end());
+    //========================= LOCKED SCOPE =========================
+    ReadWriteSpinLock::WriteGuard lock(_rwLock);
+    hint = (iter == _runQueue.end());
     if (hint)
     {
         return nullptr;
     }
-    ITask::Ptr task = *_queueIt;
+    ITask::Ptr task = *iter;
     task->terminate();
-    //Remove error task from the queue
-    _queueIt = _runQueue.erase(_queueIt);
-    //_queueIt now points to the next element in the list or to _queue.end()
+    if (_queueIt == iter)
+    {
+        _queueIt = _runQueue.erase(iter);
+        _isAdvanced = true;
+    }
+    else
+    {
+        _runQueue.erase(iter);
+    }
     _stats.decNumElements();
-    _isAdvanced = true;
     return task;
 }
 
@@ -312,7 +261,7 @@ void TaskQueue::terminate()
             _runQueue.pop_front();
         }
         //========================= LOCKED SCOPE =========================
-        SpinLock::Guard lock(_spinlock);
+        SpinLock::Guard lock(_waitQueueLock);
         while (!_waitQueue.empty())
         {
             _waitQueue.front()->terminate();
@@ -330,7 +279,7 @@ IQueueStatistics& TaskQueue::stats()
 inline
 SpinLock& TaskQueue::getLock()
 {
-    return _spinlock;
+    return _waitQueueLock;
 }
 
 inline
@@ -345,18 +294,146 @@ void TaskQueue::signalEmptyCondition(bool value)
     {
         _notEmptyCond.notify_all();
     }
+    // Notify helpers as well
+    for(TaskQueue* helper : _helpers)
+    {
+        helper->signalSharedQueueEmptyCondition(value);
+    }
 }
 
 inline
-TaskQueue::TaskListIter TaskQueue::advance()
+void TaskQueue::signalSharedQueueEmptyCondition(bool value)
 {
-    //Iterate to the next element
-    if ((_queueIt == _runQueue.end()) || (!_isAdvanced && (++_queueIt == _runQueue.end())))
     {
-        acquireWaiting();
+        //========================= LOCKED SCOPE =========================
+        std::lock_guard<std::mutex> lock(_notEmptyMutex);
+        _isSharedQueueEmpty = value;
     }
-    _isAdvanced = false; //reset flag
-    return _queueIt;
+    if (!value)
+    {
+        _notEmptyCond.notify_all();
+    }
+}
+
+inline
+bool TaskQueue::handleNotCallable(const WorkItem& workItem)
+{
+    return handleError(workItem);
+}
+
+inline
+bool TaskQueue::handleAlreadyResumed(const WorkItem&)
+{
+    // we cannot run this coroutine since it's executing on another thread
+    return false;
+}
+
+inline
+bool TaskQueue::handleRunning(const WorkItem&)
+{
+    return true;
+}
+
+inline
+bool TaskQueue::handleSuccess(const WorkItem& workItem)
+{
+    ITaskContinuation::Ptr nextTask;
+    //Coroutine ended normally with "return 0" statement
+    _stats.incCompletedCount();
+    
+    //check if there's another task scheduled to run after this one
+    nextTask = workItem.first->getNextTask();
+    if (nextTask && (nextTask->getType() == ITask::Type::ErrorHandler))
+    {
+        //skip error handler since we don't have any errors
+        nextTask->terminate(); //invalidate the error handler
+        nextTask = nextTask->getNextTask();
+    }
+    //queue next task and de-queue current one
+    enqueue(nextTask);
+    doDequeue(_isIdle, workItem.second);
+    return true;
+}
+
+inline
+bool TaskQueue::handleError(const WorkItem& workItem)
+{
+    ITaskContinuation::Ptr nextTask;
+    //Coroutine ended with explicit user error
+    _stats.incErrorCount();
+    //Check if we have a final task to run
+    nextTask = workItem.first->getErrorHandlerOrFinalTask();
+    //queue next task and de-queue current one
+    enqueue(nextTask);
+    doDequeue(_isIdle, workItem.second);
+#ifdef __QUANTUM_PRINT_DEBUG
+    std::lock_guard<std::mutex> guard(Util::LogMutex());
+    if (rc == (int)ITask::RetCode::Exception)
+    {
+        std::cerr << "Coroutine exited with user exception." << std::endl;
+    }
+    else
+    {
+        std::cerr << "Coroutine exited with error : " << rc << std::endl;
+    }
+#endif
+    return false;
+}
+
+inline
+bool TaskQueue::handleException(const WorkItem& workItem, const std::exception* ex)
+{
+    UNUSED(ex);
+    doDequeue(_isIdle, workItem.second);
+#ifdef __QUANTUM_PRINT_DEBUG
+    std::lock_guard<std::mutex> guard(Util::LogMutex());
+    if (ex != nullptr) {
+        std::cerr << "Caught exception: " << ex.what() << std::endl;
+    }
+    else {
+        std::cerr << "Caught unknown exception." << std::endl;
+    }
+#endif
+    return false;
+}
+
+inline
+bool TaskQueue::isInterrupted()
+{
+    if (_isEmpty && _isSharedQueueEmpty)
+    {
+        std::unique_lock<std::mutex> lock(_notEmptyMutex);
+        //========================= BLOCK WHEN EMPTY =========================
+        //Wait for the queue to have at least one element
+        _notEmptyCond.wait(lock, [this]()->bool { return !_isEmpty || !_isSharedQueueEmpty || _isInterrupted; });
+    }
+    return _isInterrupted;
+}
+
+inline
+std::pair<TaskPtr, TaskQueue::TaskListIter>
+TaskQueue::grabWorkItem()
+{
+    auto it = _runQueue.end();
+    {//========================= LOCKED SCOPE =========================
+        ReadWriteSpinLock::WriteGuard guard(_rwLock);
+        if ((_queueIt == _runQueue.end()) || (!_isAdvanced && (++_queueIt == _runQueue.end())))
+        {
+            acquireWaiting();
+        }
+        _isAdvanced = false; //reset flag
+        if (_runQueue.empty())
+        {
+            return {nullptr, _runQueue.end()};
+        }
+        it = _queueIt;
+    }
+    Task::Ptr task = *it;
+    if (task->isBlocked() || task->isSleeping(true) || !task->isSuspended())
+    {
+        return {nullptr, _runQueue.end()};
+    }
+    return {task, it};
 }
 
 inline
@@ -369,7 +446,7 @@ inline
 void TaskQueue::acquireWaiting()
 {
     //========================= LOCKED SCOPE =========================
-    SpinLock::Guard lock(_spinlock);
+    SpinLock::Guard lock(_waitQueueLock);
     bool isEmpty = _runQueue.empty();
     if (_waitQueue.empty())
     {

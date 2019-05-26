@@ -29,6 +29,7 @@
 #include <quantum/interface/quantum_iterminate.h>
 #include <quantum/interface/quantum_iqueue.h>
 #include <quantum/quantum_spinlock.h>
+#include <quantum/quantum_read_write_spinlock.h>
 #include <quantum/quantum_yielding_thread.h>
 #include <quantum/quantum_queue_statistics.h>
 #include <quantum/quantum_configuration.h>
@@ -50,7 +51,8 @@ public:
     
     TaskQueue();
     
-    explicit TaskQueue(const Configuration& config);
+    TaskQueue(const Configuration& config,
+              std::shared_ptr<TaskQueue> sharedQueue);
     
     TaskQueue(const TaskQueue& other);
     
@@ -85,9 +87,23 @@ public:
     bool isIdle() const final;
 
 private:
-    TaskListIter advance();
+    using WorkItem = std::pair<TaskPtr, TaskListIter>;
+    //Coroutine result handlers
+    bool handleNotCallable(const WorkItem& entry);
+    bool handleAlreadyResumed(const WorkItem& entry);
+    bool handleRunning(const WorkItem& entry);
+    bool handleSuccess(const WorkItem& entry);
+    bool handleError(const WorkItem& entry);
+    bool handleException(const WorkItem& workItem,
+                         const std::exception* ex = nullptr);
+    
+    bool isInterrupted();
+    void signalSharedQueueEmptyCondition(bool value);
+    bool processTask();
+    WorkItem grabWorkItem();
     void doEnqueue(ITask::Ptr task);
-    ITask::Ptr doDequeue(std::atomic_bool& hint);
+    ITask::Ptr doDequeue(std::atomic_bool& hint,
+                         TaskListIter iter);
     void acquireWaiting();
     
     QueueListAllocator                  _alloc;
@@ -96,15 +112,19 @@ private:
     TaskList                            _waitQueue;
     TaskListIter                        _queueIt;
     TaskListIter                        _blockedIt;
-    mutable SpinLock                    _spinlock;
+    mutable SpinLock                    _waitQueueLock;
+    mutable ReadWriteSpinLock           _rwLock;
     std::mutex                          _notEmptyMutex; //for accessing the condition variable
     std::condition_variable             _notEmptyCond;
     std::atomic_bool                    _isEmpty;
+    std::atomic_bool                    _isSharedQueueEmpty;
     std::atomic_bool                    _isInterrupted;
     std::atomic_bool                    _isIdle;
     std::atomic_bool                    _terminated;
     bool                                _isAdvanced;
     QueueStatistics                     _stats;
+    std::shared_ptr<TaskQueue>          _sharedQueue;
+    std::vector<TaskQueue*>             _helpers;
 };
 
 }}

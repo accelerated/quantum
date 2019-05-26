@@ -30,6 +30,7 @@ public:
         if (_dispatcher == nullptr)
         {
             quantum::Configuration config;
+            config.setCoroutineSharingForAny(true);
             config.setNumCoroutineThreads(numCoro);
             config.setNumIoThreads(numThreads);
             config.setLoadBalanceSharedIoQueues(loadBalance);

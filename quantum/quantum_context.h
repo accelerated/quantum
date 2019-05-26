@@ -340,14 +340,14 @@ private:
     void validateContext(ICoroSync::Ptr sync) const; //throws
     
     //Members
-    ITask::Ptr                          _task;
-    std::vector<IPromiseBase::Ptr>      _promises;
-    DispatcherCore*                     _dispatcher;
-    std::atomic_bool                    _terminated;
-    std::atomic_int                     _signal;
-    Traits::Yield*                      _yield;
-    std::chrono::microseconds           _sleepDuration;
-    std::chrono::high_resolution_clock::time_point  _sleepTimestamp;
+    ITask::Ptr                              _task;
+    std::vector<IPromiseBase::Ptr>          _promises;
+    DispatcherCore*                         _dispatcher;
+    std::atomic_bool                        _terminated;
+    std::atomic_int                         _signal;
+    Traits::Yield*                          _yield;
+    std::chrono::microseconds               _sleepDuration;
+    std::chrono::steady_clock::time_point   _sleepTimestamp;
 };
 
 template <class RET>

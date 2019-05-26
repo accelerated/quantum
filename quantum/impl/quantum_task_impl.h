@@ -46,7 +46,6 @@ Task::Task(std::shared_ptr<Context<RET>> ctx,
           Util::bindCaller(ctx, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
     _queueId(queueId),
     _isHighPriority(isHighPriority),
-    _rc((int)ITask::RetCode::Running),
     _type(type),
     _terminated(false),
     _isSuspended(true)
@@ -65,7 +64,6 @@ Task::Task(Void,
           Util::bindCaller2(ctx, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
     _queueId(queueId),
     _isHighPriority(isHighPriority),
-    _rc((int)ITask::RetCode::Running),
     _type(type),
     _terminated(false),
     _isSuspended(true)
@@ -90,13 +88,23 @@ void Task::terminate()
 inline
 int Task::run()
 {
-    if (_coro)
+    if (!_coro)
     {
-        SuspensionGuard guard{_isSuspended};
-        _coro(_rc);
-        return _rc;
+        return (int)ITask::RetCode::NotCallable;
     }
-    return (int)ITask::RetCode::Success;
+    int rc = (int)ITask::RetCode::Running;
+    bool suspended = true;
+    if (_isSuspended.compare_exchange_strong(suspended, false, std::memory_order::memory_order_acq_rel))
+    {
+        _coro(rc);
+        if (_coro)
+        {
+            //If the coroutine is still active, mark it as suspended
+            _isSuspended.store(true, std::memory_order::memory_order_release);
+        }
+        return rc;
+    }
+    return (int)ITask::RetCode::AlreadyResumed;
 }
 
 inline
@@ -175,7 +183,7 @@ bool Task::isSuspended() const
 {
     return _isSuspended;
 }
-
+    
 inline
 void* Task::operator new(size_t)
 {

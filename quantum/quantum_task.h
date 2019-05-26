@@ -44,6 +44,8 @@ public:
     using Ptr = std::shared_ptr<Task>;
     using WeakPtr = std::weak_ptr<Task>;
     
+    enum class State : int { Running, Suspended, Terminated };
+    
     template <class RET, class FUNC, class ... ARGS>
     Task(std::shared_ptr<Context<RET>> ctx,
          int queueId,
@@ -100,24 +102,10 @@ public:
     static void deleter(Task* p);
    
 private:
-    struct SuspensionGuard {
-        SuspensionGuard(std::atomic_bool& isSuspended) :
-            _isSuspended(isSuspended)
-        {
-            _isSuspended = false;
-        }
-        ~SuspensionGuard()
-        {
-            _isSuspended = true;
-        }
-        std::atomic_bool& _isSuspended;
-    };
-    
     ITaskAccessor::Ptr          _ctx; //holds execution context
     Traits::Coroutine           _coro; //the current runnable coroutine
     int                         _queueId;
     bool                        _isHighPriority;
-    int                         _rc; //return from the co-routine
     ITaskContinuation::Ptr      _next; //Task scheduled to run after current completes.
     ITaskContinuation::WeakPtr  _prev; //Previous task in the chain
     ITask::Type                 _type;
