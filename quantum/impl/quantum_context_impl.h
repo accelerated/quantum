@@ -718,7 +718,7 @@ int Context<RET>::index(int num) const
 }
 
 template <class RET>
-void Context<RET>::validateTaskType(ITask::Type type) const
+void Context<RET>::validateTaskType(Task::Type type) const
 {
     if (!_task)
     {
@@ -728,27 +728,27 @@ void Context<RET>::validateTaskType(ITask::Type type) const
     bool isValid = true;
     switch (type)
     {
-        case ITask::Type::Continuation:
-        case ITask::Type::ErrorHandler:
-            if ((_task->getType() != ITask::Type::First) &&
-                (_task->getType() != ITask::Type::Continuation))
+        case Task::Type::Continuation:
+        case Task::Type::ErrorHandler:
+            if ((_task->getType() != Task::Type::First) &&
+                (_task->getType() != Task::Type::Continuation))
             {
                 isValid = false;
             }
             break;
-        case ITask::Type::Final:
-            if ((_task->getType() != ITask::Type::First) &&
-                (_task->getType() != ITask::Type::Continuation) &&
-                (_task->getType() != ITask::Type::ErrorHandler))
+        case Task::Type::Final:
+            if ((_task->getType() != Task::Type::First) &&
+                (_task->getType() != Task::Type::Continuation) &&
+                (_task->getType() != Task::Type::ErrorHandler))
             {
                 isValid = false;
             }
             break;
-        case ITask::Type::Termination:
-            if ((_task->getType() != ITask::Type::First) &&
-                (_task->getType() != ITask::Type::Continuation) &&
-                (_task->getType() != ITask::Type::ErrorHandler) &&
-                (_task->getType() != ITask::Type::Final))
+        case Task::Type::Termination:
+            if ((_task->getType() != Task::Type::First) &&
+                (_task->getType() != Task::Type::Continuation) &&
+                (_task->getType() != Task::Type::ErrorHandler) &&
+                (_task->getType() != Task::Type::Final))
             {
                 isValid = false;
             }
@@ -773,13 +773,13 @@ void Context<RET>::validateContext(ICoroSync::Ptr sync) const
 }
 
 template <class RET>
-void Context<RET>::setTask(ITask::Ptr task)
+void Context<RET>::setTask(CoroTaskPtr task)
 {
     _task = task;
 }
 
 template <class RET>
-ITask::Ptr Context<RET>::getTask() const
+CoroTaskPtr Context<RET>::getTask() const
 {
     return _task;
 }
@@ -828,24 +828,24 @@ void Context<RET>::sleep(const std::chrono::microseconds& timeUs)
 template <class RET>
 template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
-Context<RET>::thenImpl(ITask::Type type, FUNC&& func, ARGS&&... args)
+Context<RET>::thenImpl(Task::Type type, FUNC&& func, ARGS&&... args)
 {
     using FirstArg = decltype(firstArgOf(func));
     auto ctx = ContextPtr<OTHER_RET>(new Context<OTHER_RET>(*this),
                                      Context<OTHER_RET>::deleter);
-    auto task = Task::Ptr(new Task(Traits::IsVoidContext<FirstArg>{},
+    auto task = CoroTaskPtr(new CoroTask(Traits::IsVoidContext<FirstArg>{},
                                    ctx,
                                    _task->getQueueId(),      //keep current queueId
                                    _task->isHighPriority(),  //keep current priority
                                    type,
                                    std::forward<FUNC>(func),
                                    std::forward<ARGS>(args)...),
-                          Task::deleter);
+                          CoroTask::deleter);
     ctx->setTask(task);
     
     //Chain tasks
-    std::static_pointer_cast<ITaskContinuation>(_task)->setNextTask(task);
-    task->setPrevTask(std::static_pointer_cast<ITaskContinuation>(_task));
+    _task->setNextTask(task);
+    task->setPrevTask(_task);
     return ctx;
 }
 
@@ -855,8 +855,8 @@ ContextPtr<OTHER_RET>
 Context<RET>::then(FUNC&& func, ARGS&&... args)
 {
     //Previous task must either be First or Continuation types
-    validateTaskType(ITask::Type::Continuation);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::Continuation,
+    validateTaskType(Task::Type::Continuation);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::Continuation,
                                               std::forward<FUNC>(func),
                                               std::forward<ARGS>(args)...);
 }
@@ -867,8 +867,8 @@ ContextPtr<OTHER_RET>
 Context<RET>::then2(FUNC&& func, ARGS&&... args)
 {
     //Previous task must either be First or Continuation types
-    validateTaskType(ITask::Type::Continuation);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::Continuation,
+    validateTaskType(Task::Type::Continuation);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::Continuation,
                                                std::forward<FUNC>(func),
                                                std::forward<ARGS>(args)...);
 }
@@ -878,8 +878,8 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::onError(FUNC&& func, ARGS&&... args)
 {
-    validateTaskType(ITask::Type::ErrorHandler);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::ErrorHandler,
+    validateTaskType(Task::Type::ErrorHandler);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::ErrorHandler,
                                               std::forward<FUNC>(func),
                                               std::forward<ARGS>(args)...);
 }
@@ -889,8 +889,8 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::onError2(FUNC&& func, ARGS&&... args)
 {
-    validateTaskType(ITask::Type::ErrorHandler);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::ErrorHandler,
+    validateTaskType(Task::Type::ErrorHandler);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::ErrorHandler,
                                                std::forward<FUNC>(func),
                                                std::forward<ARGS>(args)...);
 }
@@ -900,8 +900,8 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::finally(FUNC&& func, ARGS&&... args)
 {
-    validateTaskType(ITask::Type::Final);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::Final,
+    validateTaskType(Task::Type::Final);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::Final,
                                               std::forward<FUNC>(func),
                                               std::forward<ARGS>(args)...);
 }
@@ -911,8 +911,8 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::finally2(FUNC&& func, ARGS&&... args)
 {
-    validateTaskType(ITask::Type::Final);
-    return thenImpl<OTHER_RET, FUNC, ARGS...>(ITask::Type::Final,
+    validateTaskType(Task::Type::Final);
+    return thenImpl<OTHER_RET, FUNC, ARGS...>(Task::Type::Final,
                                                std::forward<FUNC>(func),
                                                std::forward<ARGS>(args)...);
 }
@@ -921,9 +921,9 @@ template <class RET>
 typename Context<RET>::Ptr
 Context<RET>::end()
 {
-    validateTaskType(ITask::Type::Termination);
+    validateTaskType(Task::Type::Termination);
     //Async post to next available queue since the previous task in the chain already terminated
-    auto task = std::static_pointer_cast<Task>(std::static_pointer_cast<ITaskContinuation>(getTask())->getFirstTask());
+    auto task = getTask()->getFirstTask();
     _dispatcher->post(task);
     return dynamic_cast<Context<RET>*>(this)->shared_from_this();
 }
@@ -933,7 +933,7 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 CoroFuturePtr<OTHER_RET>
 Context<RET>::postAsyncIo(FUNC&& func, ARGS&&... args)
 {
-    return postAsyncIoImpl<OTHER_RET>((int)IQueue::QueueId::Any,
+    return postAsyncIoImpl<OTHER_RET>((int)Queue::Id::Any,
                                       false,
                                       std::forward<FUNC>(func),
                                       std::forward<ARGS>(args)...);
@@ -944,7 +944,7 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 CoroFuturePtr<OTHER_RET>
 Context<RET>::postAsyncIo2(FUNC&& func, ARGS&&... args)
 {
-    return postAsyncIoImpl<OTHER_RET>((int)IQueue::QueueId::Any,
+    return postAsyncIoImpl<OTHER_RET>((int)Queue::Id::Any,
                                        false,
                                        std::forward<FUNC>(func),
                                        std::forward<ARGS>(args)...);
@@ -978,12 +978,12 @@ CoroFuturePtr<OTHER_RET>
 Context<RET>::postAsyncIoImpl(int queueId, bool isHighPriority, FUNC&& func, ARGS&&... args)
 {
     using FirstArg = decltype(firstArgOf(func));
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid coroutine queue id");
     }
     auto promise = PromisePtr<OTHER_RET>(new Promise<OTHER_RET>(), Promise<OTHER_RET>::deleter);
-    auto task = IoTask::Ptr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
+    auto task = IoTaskPtr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
                                        promise,
                                        queueId,
                                        isHighPriority,
@@ -1346,8 +1346,8 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::post(FUNC&& func, ARGS&&... args)
 {
-    return postImpl<OTHER_RET>((int)IQueue::QueueId::Any,
-                               false, ITask::Type::Standalone,
+    return postImpl<OTHER_RET>((int)Queue::Id::Any,
+                               false, Task::Type::Standalone,
                                std::forward<FUNC>(func),
                                std::forward<ARGS>(args)...);
 }
@@ -1357,9 +1357,9 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::post2(FUNC&& func, ARGS&&... args)
 {
-    return postImpl<OTHER_RET>((int)IQueue::QueueId::Any,
+    return postImpl<OTHER_RET>((int)Queue::Id::Any,
                                 false,
-                                ITask::Type::Standalone,
+                                Task::Type::Standalone,
                                 std::forward<FUNC>(func),
                                 std::forward<ARGS>(args)...);
 }
@@ -1371,7 +1371,7 @@ Context<RET>::post(int queueId, bool isHighPriority, FUNC&& func, ARGS&&... args
 {
     return postImpl<OTHER_RET>(queueId,
                                isHighPriority,
-                               ITask::Type::Standalone,
+                               Task::Type::Standalone,
                                std::forward<FUNC>(func),
                                std::forward<ARGS>(args)...);
 }
@@ -1383,7 +1383,7 @@ Context<RET>::post2(int queueId, bool isHighPriority, FUNC&& func, ARGS&&... arg
 {
     return postImpl<OTHER_RET>(queueId,
                                 isHighPriority,
-                                ITask::Type::Standalone,
+                                Task::Type::Standalone,
                                 std::forward<FUNC>(func),
                                 std::forward<ARGS>(args)...);
 }
@@ -1393,9 +1393,9 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::postFirst(FUNC&& func, ARGS&&... args)
 {
-    return postImpl<OTHER_RET>((int)IQueue::QueueId::Any,
+    return postImpl<OTHER_RET>((int)Queue::Id::Any,
                                false,
-                               ITask::Type::First,
+                               Task::Type::First,
                                std::forward<FUNC>(func),
                                std::forward<ARGS>(args)...);
 }
@@ -1406,9 +1406,9 @@ template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
 Context<RET>::postFirst2(FUNC&& func, ARGS&&... args)
 {
-    return postImpl<OTHER_RET>((int)IQueue::QueueId::Any,
+    return postImpl<OTHER_RET>((int)Queue::Id::Any,
                                 false,
-                                ITask::Type::First,
+                                Task::Type::First,
                                 std::forward<FUNC>(func),
                                 std::forward<ARGS>(args)...);
 }
@@ -1420,7 +1420,7 @@ Context<RET>::postFirst(int queueId, bool isHighPriority, FUNC&& func, ARGS&&...
 {
     return postImpl<OTHER_RET>(queueId,
                                isHighPriority,
-                               ITask::Type::First,
+                               Task::Type::First,
                                std::forward<FUNC>(func),
                                std::forward<ARGS>(args)...);
 }
@@ -1432,7 +1432,7 @@ Context<RET>::postFirst2(int queueId, bool isHighPriority, FUNC&& func, ARGS&&..
 {
     return postImpl<OTHER_RET>(queueId,
                                 isHighPriority,
-                                ITask::Type::First,
+                                Task::Type::First,
                                 std::forward<FUNC>(func),
                                 std::forward<ARGS>(args)...);
 }
@@ -1440,25 +1440,25 @@ Context<RET>::postFirst2(int queueId, bool isHighPriority, FUNC&& func, ARGS&&..
 template <class RET>
 template <class OTHER_RET, class FUNC, class ... ARGS>
 ContextPtr<OTHER_RET>
-Context<RET>::postImpl(int queueId, bool isHighPriority, ITask::Type type, FUNC&& func, ARGS&&... args)
+Context<RET>::postImpl(int queueId, bool isHighPriority, Task::Type type, FUNC&& func, ARGS&&... args)
 {
     using FirstArg = decltype(firstArgOf(func));
-    if (queueId < (int)IQueue::QueueId::Same)
+    if (queueId < (int)Queue::Id::Same)
     {
         throw std::runtime_error("Invalid coroutine queue id");
     }
     auto ctx = ContextPtr<OTHER_RET>(new Context<OTHER_RET>(*_dispatcher),
                                      Context<OTHER_RET>::deleter);
-    auto task = Task::Ptr(new Task(Traits::IsVoidContext<FirstArg>{},
+    auto task = CoroTaskPtr(new CoroTask(Traits::IsVoidContext<FirstArg>{},
                                    ctx,
-                                   (queueId == (int)IQueue::QueueId::Same) ? _task->getQueueId() : queueId,
+                                   (queueId == (int)Queue::Id::Same) ? _task->getQueueId() : queueId,
                                    isHighPriority,
                                    type,
                                    std::forward<FUNC>(func),
                                    std::forward<ARGS>(args)...),
-                          Task::deleter);
+                          CoroTask::deleter);
     ctx->setTask(task);
-    if (type == ITask::Type::Standalone)
+    if (type == Task::Type::Standalone)
     {
         _dispatcher->post(task);
     }

@@ -29,7 +29,7 @@
 #include <pthread.h>
 #endif
 #include <quantum/quantum_configuration.h>
-#include <quantum/quantum_task_queue.h>
+#include <quantum/quantum_coro_queue.h>
 #include <quantum/quantum_io_queue.h>
 
 namespace Bloomberg {
@@ -51,17 +51,17 @@ public:
     
     void terminate() final;
     
-    size_t size(IQueue::QueueType type, int queueId) const;
+    size_t size(Queue::Type type, int queueId) const;
     
-    bool empty(IQueue::QueueType type, int queueId) const;
+    bool empty(Queue::Type type, int queueId) const;
     
-    QueueStatistics stats(IQueue::QueueType type, int queueId);
+    QueueStatistics stats(Queue::Type type, int queueId);
     
     void resetStats();
     
-    void post(Task::Ptr task);
+    void post(CoroTaskPtr task);
     
-    void postAsyncIo(IoTask::Ptr task);
+    void postAsyncIo(IoTaskPtr task);
     
     int getNumCoroutineThreads() const;
     
@@ -85,8 +85,8 @@ private:
     QueueStatistics ioStats(int queueId);
     
     //Members
-    std::shared_ptr<TaskQueue>  _sharedCoroAnyQueue; // shared coro queue for Any
-    std::vector<TaskQueue>      _coroQueues;     //coroutine queues
+    std::shared_ptr<CoroQueue>  _sharedCoroAnyQueue; // shared coro queue for Any
+    std::vector<CoroQueue>      _coroQueues;     //coroutine queues
     std::vector<IoQueue>        _sharedIoQueues; //shared IO task queues (hold tasks posted to 'Any' IO queue)
     std::vector<IoQueue>        _ioQueues;       //dedicated IO task queues
     bool                        _loadBalanceSharedIoQueues; //tasks posted to 'Any' IO queue are load balanced

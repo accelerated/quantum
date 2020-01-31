@@ -30,7 +30,7 @@ namespace quantum {
 /// @note See IQueueStatistics for detailed description.
 class QueueStatistics : public IQueueStatistics
 {
-    friend class TaskQueue;
+    friend class CoroQueue;
     friend class IOQueue;
     
 public:

@@ -18,7 +18,7 @@
 //##############################################################################################
 //#################################### IMPLEMENTATIONS #########################################
 //##############################################################################################
-#include <quantum/quantum_task_queue.h>
+#include <quantum/quantum_coro_queue.h>
 #include <quantum/quantum_context.h>
 #include <stdexcept>
 #include <memory>
@@ -31,10 +31,10 @@ template <typename T>
 T*& variable(const std::string& key)
 {
     // default thread local map to be used outside of coroutines
-    thread_local Task::CoroLocalStorage defaultStorage;
+    thread_local CoroTask::CoroLocalStorage defaultStorage;
     
-    Task* task = TaskQueue::getCurrentTask();
-    Task::CoroLocalStorage& storage = task ? task->getCoroLocalStorage() : defaultStorage;
+    CoroTask* task = CoroQueue::getCurrentTask();
+    CoroTask::CoroLocalStorage& storage = task ? task->getCoroLocalStorage() : defaultStorage;
     
     void** r = &storage.emplace(key, nullptr).first->second;
     return *reinterpret_cast<T**>(r);
@@ -43,7 +43,7 @@ T*& variable(const std::string& key)
 inline
 VoidContextPtr context()
 {
-    Task* task = TaskQueue::getCurrentTask();
+    CoroTask* task = CoroQueue::getCurrentTask();
     if (!task)
     {
         return nullptr;

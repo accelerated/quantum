@@ -24,7 +24,7 @@ namespace quantum {
 
 inline
 DispatcherCore::DispatcherCore(const Configuration& config) :
-    _sharedCoroAnyQueue(config.getCoroutineSharingForAny() ? std::make_shared<TaskQueue>(config, nullptr): nullptr),
+    _sharedCoroAnyQueue(config.getCoroutineSharingForAny() ? std::make_shared<CoroQueue>(config, nullptr): nullptr),
     _sharedIoQueues((config.getNumIoThreads() <= 0) ? 1 : config.getNumIoThreads(), IoQueue(config, nullptr)),
     _ioQueues((config.getNumIoThreads() <= 0) ? 1 : config.getNumIoThreads(), IoQueue(config, &_sharedIoQueues)),
     _loadBalanceSharedIoQueues(false),
@@ -46,11 +46,11 @@ DispatcherCore::DispatcherCore(const Configuration& config) :
     
     // set thread name for shared queue
     if (_sharedCoroAnyQueue) {
-        IQueue::setThreadName(IQueue::QueueType::Coro,
-                              _sharedCoroAnyQueue->getThread()->native_handle(),
-                              0,
-                              true,
-                              false);
+        Queue::setThreadName(Queue::Type::Coro,
+                             _sharedCoroAnyQueue->getThread()->native_handle(),
+                             0,
+                             true,
+                             false);
     }
 
     // start the coro threads
@@ -61,21 +61,21 @@ DispatcherCore::DispatcherCore(const Configuration& config) :
                                coroId <= _coroQueueIdRangeForAny.second);
         _coroQueues.emplace_back(config, hasSharedQueue ? _sharedCoroAnyQueue : nullptr);
         // set thread name for coro queues
-        IQueue::setThreadName(IQueue::QueueType::Coro,
-                              _coroQueues.back().getThread()->native_handle(),
-                              coroId,
-                              false,
-                              hasSharedQueue);
+        Queue::setThreadName(Queue::Type::Coro,
+                             _coroQueues.back().getThread()->native_handle(),
+                             coroId,
+                             false,
+                             hasSharedQueue);
     }
     
     // set thread names for io queues
     for (size_t ioId = 0; ioId < _ioQueues.size(); ++ioId)
     {
-        IQueue::setThreadName(IQueue::QueueType::IO,
-                              _ioQueues[ioId].getThread()->native_handle(),
-                              ioId,
-                              false,
-                              false);
+        Queue::setThreadName(Queue::Type::IO,
+                             _ioQueues[ioId].getThread()->native_handle(),
+                             ioId,
+                             false,
+                             false);
     }
     
     // pin to cores
@@ -121,18 +121,18 @@ void DispatcherCore::terminate()
 }
 
 inline
-size_t DispatcherCore::size(IQueue::QueueType type,
+size_t DispatcherCore::size(Queue::Type type,
                             int queueId) const
 {
-    if (type == IQueue::QueueType::All)
+    if (type == Queue::Type::All)
     {
-        if (queueId != (int)IQueue::QueueId::All)
+        if (queueId != (int)Queue::Id::All)
         {
             throw std::runtime_error("Cannot specify queue id");
         }
-        return coroSize((int)IQueue::QueueId::All) + ioSize((int)IQueue::QueueId::All);
+        return coroSize((int)Queue::Id::All) + ioSize((int)Queue::Id::All);
     }
-    else if (type == IQueue::QueueType::Coro)
+    else if (type == Queue::Type::Coro)
     {
         return coroSize(queueId);
     }
@@ -140,18 +140,18 @@ size_t DispatcherCore::size(IQueue::QueueType type,
 }
 
 inline
-bool DispatcherCore::empty(IQueue::QueueType type,
+bool DispatcherCore::empty(Queue::Type type,
                            int queueId) const
 {
-    if (type == IQueue::QueueType::All)
+    if (type == Queue::Type::All)
     {
-        if (queueId != (int)IQueue::QueueId::All)
+        if (queueId != (int)Queue::Id::All)
         {
             throw std::runtime_error("Cannot specify queue id");
         }
-        return coroEmpty((int)IQueue::QueueId::All) && ioEmpty((int)IQueue::QueueId::All);
+        return coroEmpty((int)Queue::Id::All) && ioEmpty((int)Queue::Id::All);
     }
-    else if (type == IQueue::QueueType::Coro)
+    else if (type == Queue::Type::Coro)
     {
         return coroEmpty(queueId);
     }
@@ -161,7 +161,7 @@ bool DispatcherCore::empty(IQueue::QueueType type,
 inline
 size_t DispatcherCore::coroSize(int queueId) const
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         size_t size = 0;
         for (auto&& queue : _coroQueues)
@@ -184,7 +184,7 @@ size_t DispatcherCore::coroSize(int queueId) const
 inline
 bool DispatcherCore::coroEmpty(int queueId) const
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         for (auto&& queue : _coroQueues)
         {
@@ -206,7 +206,7 @@ bool DispatcherCore::coroEmpty(int queueId) const
 inline
 size_t DispatcherCore::ioSize(int queueId) const
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         size_t size = 0;
         for (auto&& queue : _ioQueues)
@@ -219,7 +219,7 @@ size_t DispatcherCore::ioSize(int queueId) const
         }
         return size;
     }
-    else if (queueId == (int)IQueue::QueueId::Any)
+    else if (queueId == (int)Queue::Id::Any)
     {
         size_t size = 0;
         for (auto&& queue : _sharedIoQueues)
@@ -234,7 +234,7 @@ size_t DispatcherCore::ioSize(int queueId) const
 inline
 bool DispatcherCore::ioEmpty(int queueId) const
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         for (auto&& queue : _sharedIoQueues)
         {
@@ -252,7 +252,7 @@ bool DispatcherCore::ioEmpty(int queueId) const
         }
         return true;
     }
-    else if (queueId == (int)IQueue::QueueId::Any)
+    else if (queueId == (int)Queue::Id::Any)
     {
         for (auto&& queue : _sharedIoQueues)
         {
@@ -267,17 +267,17 @@ bool DispatcherCore::ioEmpty(int queueId) const
 }
 
 inline
-QueueStatistics DispatcherCore::stats(IQueue::QueueType type, int queueId)
+QueueStatistics DispatcherCore::stats(Queue::Type type, int queueId)
 {
-    if (type == IQueue::QueueType::All)
+    if (type == Queue::Type::All)
     {
-        if (queueId != (int)IQueue::QueueId::All)
+        if (queueId != (int)Queue::Id::All)
         {
             throw std::runtime_error("Cannot specify queue id");
         }
-        return coroStats((int)IQueue::QueueId::All) + ioStats((int)IQueue::QueueId::All);
+        return coroStats((int)Queue::Id::All) + ioStats((int)Queue::Id::All);
     }
-    else if (type == IQueue::QueueType::Coro)
+    else if (type == Queue::Type::Coro)
     {
         return coroStats(queueId);
     }
@@ -287,7 +287,7 @@ QueueStatistics DispatcherCore::stats(IQueue::QueueType type, int queueId)
 inline
 QueueStatistics DispatcherCore::coroStats(int queueId)
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         QueueStatistics stats;
         for (auto&& queue : _coroQueues)
@@ -313,7 +313,7 @@ QueueStatistics DispatcherCore::coroStats(int queueId)
 inline
 QueueStatistics DispatcherCore::ioStats(int queueId)
 {
-    if (queueId == (int)IQueue::QueueId::All)
+    if (queueId == (int)Queue::Id::All)
     {
         QueueStatistics stats;
         for (auto&& queue : _ioQueues)
@@ -326,7 +326,7 @@ QueueStatistics DispatcherCore::ioStats(int queueId)
         }
         return stats;
     }
-    else if (queueId == (int)IQueue::QueueId::Any)
+    else if (queueId == (int)Queue::Id::Any)
     {
         QueueStatistics stats;
         for (auto&& queue : _sharedIoQueues)
@@ -367,14 +367,14 @@ void DispatcherCore::resetStats()
 }
 
 inline
-void DispatcherCore::post(Task::Ptr task)
+void DispatcherCore::post(CoroTaskPtr task)
 {
     if (!task)
     {
         return;
     }
     
-    if (task->getQueueId() == (int)IQueue::QueueId::Any)
+    if (task->getQueueId() == (int)Queue::Id::Any)
     {
         if (_sharedCoroAnyQueue)
         {
@@ -414,14 +414,14 @@ void DispatcherCore::post(Task::Ptr task)
 }
 
 inline
-void DispatcherCore::postAsyncIo(IoTask::Ptr task)
+void DispatcherCore::postAsyncIo(IoTaskPtr task)
 {
     if (!task)
     {
         return;
     }
     
-    if (task->getQueueId() == (int)IQueue::QueueId::Any)
+    if (task->getQueueId() == (int)Queue::Id::Any)
     {
         if (_loadBalanceSharedIoQueues)
         {

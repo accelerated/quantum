@@ -77,9 +77,9 @@ public:
     /// @tparam FUNC Callable object type which will be wrapped in a coroutine with signature 'int(VoidContextPtr, Args...)'
     /// @tparam ARGS Argument types passed to FUNC (@see Dispatcher::post for more details).
     /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can
-    ///                    specify IQueue::QueueId::Any as a value, which is equivalent to running
+    ///                    specify Queue::Id::Any as a value, which is equivalent to running
     ///                    the simpler version of post() above. Valid range is [0, numCoroutineThreads) or
-    ///                    IQueue::QueueId::Any.
+    ///                    Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the sequencer coroutine will be scheduled right 
     ///                           after the currently executing coroutine on 'queueId'.
     /// @param[in] opaque pointer to opaque data that is passed to the exception handler (if provided)
@@ -90,7 +90,7 @@ public:
     /// @note This function is non-blocking and returns immediately.
     /// @note For lowering the latencies of processing tasks posted here, queueId is suggested to be
     ///       different from the control queue id (@see SequencerConfiguration::setControlQueueId). Hence, if
-    ///       IQueue::QueueId::Any is intended to be used as queueId here, then it is suggested that the configured
+    ///       Queue::Id::Any is intended to be used as queueId here, then it is suggested that the configured
     ///       Any-coroutine-queue-range (@see Configuration::setCoroQueueIdRangeForAny) does not contain
     ///       the control queue id.
     /// @warning The VoidContextPtr can be used to yield() or to post additional coroutines or IO tasks.
@@ -125,9 +125,9 @@ public:
     /// @tparam FUNC Callable object type which will be wrapped in a coroutine with signature 'int(VoidContextPtr, Args...)'
     /// @tparam ARGS Argument types passed to FUNC (@see Dispatcher::post for more details).
     /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user 
-    ///                    can specify IQueue::QueueId::Any as a value, which is equivalent to running 
+    ///                    can specify Queue::Id::Any as a value, which is equivalent to running
     ///                    the simpler version of post() above. Valid range is [0, numCoroutineThreads) or 
-    ///                    IQueue::QueueId::Any.
+    ///                    Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the sequencer coroutine will be scheduled right 
     ///                           after the currently executing coroutine on 'queueId'.
     /// @param[in] opaque pointer to opaque data that is passed to the exception handler (if provided)
@@ -138,7 +138,7 @@ public:
     /// @note This function is non-blocking and returns immediately.
     /// @note For lowering the latencies of processing tasks posted here, queueId is suggested to be
     ///       different from the control queue id (@see SequencerConfiguration::setControlQueueId). Hence, if
-    ///       IQueue::QueueId::Any is intended to be used as queueId here, then it is suggested that the configured
+    ///       Queue::Id::Any is intended to be used as queueId here, then it is suggested that the configured
     ///       Any-coroutine-queue-range (@see Configuration::setCoroQueueIdRangeForAny) does not contain
     ///       the control queue id.
     /// @warning The VoidContextPtr can be used to yield() or to post additional coroutines or IO tasks.
@@ -177,9 +177,9 @@ public:
     /// @tparam FUNC Callable object type which will be wrapped in a coroutine with signature 'int(VoidContextPtr, Args...)'
     /// @tparam ARGS Argument types passed to FUNC (@see Dispatcher::post for more details).
     /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user 
-    ///                    can specify IQueue::QueueId::Any as a value, which is equivalent to running 
+    ///                    can specify Queue::Id::Any as a value, which is equivalent to running
     ///                    the simpler version of post() above. Valid range is [0, numCoroutineThreads) or 
-    ///                    IQueue::QueueId::Any.
+    ///                    Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the sequencer coroutine will be scheduled right 
     ///                           after the currently executing coroutine on 'queueId'.
     /// @param[in] opaque pointer to opaque data that is passed to the exception handler (if provided)
@@ -189,7 +189,7 @@ public:
     /// @note This function is non-blocking and returns immediately.
     /// @note For lowering the latencies of processing tasks posted here, queueId is suggested to be
     ///       different from the control queue id (@see SequencerConfiguration::setControlQueueId). Hence, if
-    ///       IQueue::QueueId::Any is intended to be used as queueId here, then it is suggested that the configured
+    ///       Queue::Id::Any is intended to be used as queueId here, then it is suggested that the configured
     ///       Any-coroutine-queue-range (@see Configuration::setCoroQueueIdRangeForAny) does not contain
     ///       the control queue id.
     /// @warning The VoidContextPtr can be used to yield() or to post additional coroutines or IO tasks.

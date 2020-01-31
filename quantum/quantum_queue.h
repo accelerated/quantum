@@ -13,12 +13,11 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-#ifndef BLOOMBERG_QUANTUM_IQUEUE_H
-#define BLOOMBERG_QUANTUM_IQUEUE_H
+#ifndef BLOOMBERG_QUANTUM_QUEUE_H
+#define BLOOMBERG_QUANTUM_QUEUE_H
 
 #include <quantum/quantum_spinlock.h>
-#include <quantum/interface/quantum_iterminate.h>
-#include <quantum/interface/quantum_itask.h>
+#include <quantum/quantum_task.h>
 #include <quantum/interface/quantum_iqueue_statistics.h>
 #include <quantum/quantum_allocator.h>
 #ifndef __GLIBC__
@@ -31,64 +30,41 @@ namespace Bloomberg {
 namespace quantum {
 
 //==============================================================================================
-//                                  interface IQueue
+//                                  struct Queue
 //==============================================================================================
-/// @interface IQueue
+/// @struct Queue
 /// @brief Interface to a task queue. For internal use only.
-struct IQueue : public ITerminate
+struct Queue
 {
     //Typedefs and enum definitions
-    using Ptr = std::shared_ptr<IQueue>;
-    enum class QueueType : int { Coro, IO, All };
-    enum class QueueId : int { Any = -1, Same = -2, All = -3 };
+    enum class Type : int { Coro, IO, All };
+    enum class Id : int { Any = -1, Same = -2, All = -3 };
     
-    //Interface methods
-    virtual void pinToCore(int coreId) = 0;
+    //Backward compatibility name forwarding
+    using QueueId = Id;
+    using QueueType = Type;
     
-    virtual void run() = 0;
-    
-    virtual void enqueue(ITask::Ptr task) = 0;
-    
-    virtual bool tryEnqueue(ITask::Ptr task) = 0;
-    
-    virtual ITask::Ptr dequeue(std::atomic_bool& hint) = 0;
-    
-    virtual ITask::Ptr tryDequeue(std::atomic_bool& hint) = 0;
-    
-    virtual size_t size() const = 0;
-    
-    virtual bool empty() const = 0;
-    
-    virtual IQueueStatistics& stats() = 0;
-    
-    virtual SpinLock& getLock() = 0;
-    
-    virtual void signalEmptyCondition(bool value) = 0;
-    
-    virtual bool isIdle() const = 0;
-    
-    virtual const std::shared_ptr<std::thread>& getThread() const = 0;
-    
-    static void setThreadName(QueueType type,
+    static void setThreadName(Type type,
                               std::thread::native_handle_type threadHandle,
                               int queueId,
                               bool shared,
                               bool any);
 };
 
-using IQueuePtr = IQueue::Ptr;
+//Backward compatibility name forwarding
+using IQueue = Queue;
 
 inline
-void IQueue::setThreadName(QueueType type,
-                           std::thread::native_handle_type threadHandle,
-                           int queueId,
-                           bool shared,
-                           bool any)
+void Queue::setThreadName(Queue::Type type,
+                          std::thread::native_handle_type threadHandle,
+                          int queueId,
+                          bool shared,
+                          bool any)
 {
     int idx = 0;
     char name[16] = {0};
     memcpy(name + idx, "quantum:", 8); idx += 8;
-    if (type == QueueType::Coro) {
+    if (type == Queue::Type::Coro) {
         memcpy(name + idx, "co:", 3); idx += 3;
         if (shared) {
             memcpy(name + idx, "s:", 2); idx += 2;
@@ -111,11 +87,11 @@ void IQueue::setThreadName(QueueType type,
 
 #ifndef __QUANTUM_USE_DEFAULT_ALLOCATOR
     #ifdef __QUANTUM_ALLOCATE_POOL_FROM_HEAP
-        using QueueListAllocator = HeapAllocator<ITask::Ptr>;
-        using IoQueueListAllocator = HeapAllocator<ITask::Ptr>;
+        using QueueListAllocator = HeapAllocator<CoroTaskPtr>;
+        using IoQueueListAllocator = HeapAllocator<IoTaskPtr>;
     #else
-        using QueueListAllocator = StackAllocator<ITask::Ptr, __QUANTUM_QUEUE_LIST_ALLOC_SIZE>;
-        using IoQueueListAllocator = StackAllocator<ITask::Ptr, __QUANTUM_IO_QUEUE_LIST_ALLOC_SIZE>;
+        using QueueListAllocator = StackAllocator<CoroTaskPtr, __QUANTUM_QUEUE_LIST_ALLOC_SIZE>;
+        using IoQueueListAllocator = StackAllocator<IoTaskPtr, __QUANTUM_IO_QUEUE_LIST_ALLOC_SIZE>;
     #endif
 #else
     using QueueListAllocator = StlAllocator<ITask::Ptr>;
@@ -124,4 +100,4 @@ void IQueue::setThreadName(QueueType type,
 
 }}
 
-#endif //BLOOMBERG_QUANTUM_IQUEUE_H
+#endif //BLOOMBERG_QUANTUM_QUEUE_H

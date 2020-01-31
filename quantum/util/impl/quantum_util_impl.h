@@ -61,8 +61,8 @@ int bindCoro(Traits::Yield& yield,
 #endif
         ctx->setException(std::current_exception());
     }
-    yield.get() = (int)ITask::RetCode::Exception;
-    return (int)ITask::RetCode::Exception;
+    yield.get() = (int)Task::Status::Exception;
+    return (int)Task::Status::Exception;
 }
 
 template <typename RET, typename CAPTURE>
@@ -100,8 +100,8 @@ int bindCoro2(Traits::Yield& yield,
 #endif
         ctx->setException(std::current_exception());
     }
-    yield.get() = (int)ITask::RetCode::Exception;
-    return (int)ITask::RetCode::Exception;
+    yield.get() = (int)Task::Status::Exception;
+    return (int)Task::Status::Exception;
 }
 
 template <typename RET, typename CAPTURE>
@@ -129,7 +129,7 @@ int bindIo(std::shared_ptr<Promise<RET>> promise,
 #endif
         promise->setException(std::current_exception());
     }
-    return (int)ITask::RetCode::Exception;
+    return (int)Task::Status::Exception;
 }
 
 template <typename RET, typename CAPTURE>
@@ -158,7 +158,7 @@ int bindIo2(std::shared_ptr<Promise<RET>> promise,
 #endif
         promise->setException(std::current_exception());
     }
-    return (int)ITask::RetCode::Exception;
+    return (int)Task::Status::Exception;
 }
 
 //==============================================================================================

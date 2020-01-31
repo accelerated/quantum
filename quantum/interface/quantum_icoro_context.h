@@ -148,9 +148,9 @@ struct ICoroContext : ICoroContextBase
     ///       to a specific queue.
     int getNumIoThreads() const;
 
-    /// @brief Gets the range [minQueueId, maxQueueId] of coroutine queueIds covered by IQueue::QueueId::Any
+    /// @brief Gets the range [minQueueId, maxQueueId] of coroutine queueIds covered by Queue::Id::Any
     /// by the Dispatcher.
-    /// @return queueIdRange The range of queueIds that IQueue::QueueId::Any covers
+    /// @return queueIdRange The range of queueIds that Queue::Id::Any covers
     const std::pair<int, int>& getCoroQueueIdRangeForAny() const;
     
     //-----------------------------------------------------------------------------------------
@@ -195,10 +195,10 @@ struct ICoroContext : ICoroContextBase
     ///              an std::function, a functor generated via std::bind or a lambda. The signature of the callable
     ///              object must strictly be 'int f(CoroContext<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of post() above. Valid range is
-    ///                    [0, numCoroutineThreads), IQueue::QueueId::Any or IQueue::QueueId::Same. When using
-    ///                    IQueue::QueueId::Same as input, the current queueId of this execution context will be
+    ///                    [0, numCoroutineThreads), Queue::Id::Any or Queue::Id::Same. When using
+    ///                    Queue::Id::Same as input, the current queueId of this execution context will be
     ///                    preserved for the posted coroutine thus enabling to write lock-free code.
     /// @param[in] isHighPriority If set to true, the coroutine will be scheduled to run immediately after the currently
     ///                           executing coroutine on 'queueId' has completed or has yielded.
@@ -242,10 +242,10 @@ struct ICoroContext : ICoroContextBase
     ///              an std::function, a functor generated via std::bind or a lambda. The signature of the callable
     ///              object must strictly be 'int f(CoroContext<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of post() above. Valid range is
-    ///                    [0, numCoroutineThreads), IQueue::QueueId::Any or IQueue::QueueId::Same. When using
-    ///                    IQueue::QueueId::Same as input, the current queueId of this execution context will be
+    ///                    [0, numCoroutineThreads), Queue::Id::Any or Queue::Id::Same. When using
+    ///                    Queue::Id::Same as input, the current queueId of this execution context will be
     ///                    preserved for the posted coroutine thus enabling to write lock-free code.
     /// @param[in] isHighPriority If set to true, the coroutine will be scheduled to run immediately after the currently
     ///                           executing coroutine on 'queueId' has completed or has yielded.
@@ -359,9 +359,9 @@ struct ICoroContext : ICoroContextBase
     ///              generated via std::bind or a lambda. The signature of the callable object must strictly be
     ///              'int f(ThreadPromise<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this function should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this function should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of postAsyncIo() above. Valid range is
-    ///                    [0, numIoThreads) or IQueue::QueueId::Any. IQueue::QueueId::Same is disallowed.
+    ///                    [0, numIoThreads) or Queue::Id::Any. Queue::Id::Same is disallowed.
     /// @param[in] isHighPriority If set to true, the function will be scheduled to run immediately after the currently
     ///                           executing function on 'queueId' has completed.
     /// @param[in] func Callable object.

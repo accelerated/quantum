@@ -21,9 +21,9 @@
 #include <condition_variable>
 #include <iostream>
 #include <atomic>
-#include <quantum/interface/quantum_itask.h>
+#include <quantum/quantum_task.h>
 #include <quantum/interface/quantum_iterminate.h>
-#include <quantum/interface/quantum_iqueue.h>
+#include <quantum/quantum_queue.h>
 #include <quantum/quantum_io_task.h>
 #include <quantum/quantum_queue_statistics.h>
 #include <quantum/quantum_configuration.h>
@@ -37,10 +37,10 @@ namespace quantum {
 /// @class IoQueue
 /// @brief Thread queue for executing IO tasks.
 /// @note For internal use only.
-class IoQueue : public IQueue
+class IoQueue : public ITerminate
 {
 public:
-    using TaskList = std::list<IoTask::Ptr, IoQueueListAllocator>;
+    using TaskList = std::list<IoTaskPtr, IoQueueListAllocator>;
     using TaskListIter = TaskList::iterator;
     
     IoQueue();
@@ -56,38 +56,38 @@ public:
     
     void terminate() final;
     
-    void pinToCore(int coreId) final;
+    void pinToCore(int coreId);
     
-    void run() final;
+    void run();
     
-    void enqueue(ITask::Ptr task) final;
+    void enqueue(IoTaskPtr task);
     
-    bool tryEnqueue(ITask::Ptr task) final;
+    bool tryEnqueue(IoTaskPtr task);
     
-    ITask::Ptr dequeue(std::atomic_bool& hint) final;
+    IoTaskPtr dequeue(std::atomic_bool& hint);
     
-    ITask::Ptr tryDequeue(std::atomic_bool& hint) final;
+    IoTaskPtr tryDequeue(std::atomic_bool& hint);
     
-    size_t size() const final;
+    size_t size() const;
     
-    bool empty() const final;
+    bool empty() const;
     
-    IQueueStatistics& stats() final;
+    IQueueStatistics& stats();
     
-    SpinLock& getLock() final;
+    SpinLock& getLock();
     
-    void signalEmptyCondition(bool value) final;
+    void signalEmptyCondition(bool value);
     
-    bool isIdle() const final;
+    bool isIdle() const;
     
-    const std::shared_ptr<std::thread>& getThread() const final;
+    const std::shared_ptr<std::thread>& getThread() const;
     
 private:
-    ITask::Ptr grabWorkItem();
-    ITask::Ptr grabWorkItemFromAll();
-    void doEnqueue(ITask::Ptr task);
-    ITask::Ptr doDequeue(std::atomic_bool& hint);
-    ITask::Ptr tryDequeueFromShared();
+    IoTaskPtr grabWorkItem();
+    IoTaskPtr grabWorkItemFromAll();
+    void doEnqueue(IoTaskPtr task);
+    IoTaskPtr doDequeue(std::atomic_bool& hint);
+    IoTaskPtr tryDequeueFromShared();
     std::chrono::milliseconds getBackoffInterval();
     
     //async IO queue

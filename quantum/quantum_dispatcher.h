@@ -72,9 +72,9 @@ public:
     ///              an std::function, a functor generated via std::bind or a lambda. The signature of the callable
     ///              object must strictly be 'int f(CoroContext<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of post() above. Valid range is
-    ///                    [0, numCoroutineThreads) or IQueue::QueueId::Any.
+    ///                    [0, numCoroutineThreads) or Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the coroutine will be scheduled to run immediately after the currently
     ///                           executing coroutine on 'queueId' has completed or has yielded.
     /// @param[in] func Callable object.
@@ -115,9 +115,9 @@ public:
     ///              an std::function, a functor generated via std::bind or a lambda. The signature of the callable
     ///              object must strictly be 'int f(CoroContext<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this coroutine should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of post() above. Valid range is
-    ///                    [0, numCoroutineThreads) or IQueue::QueueId::Any.
+    ///                    [0, numCoroutineThreads) or Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the coroutine will be scheduled to run immediately after the currently
     ///                           executing coroutine on 'queueId' has completed or has yielded.
     /// @param[in] func Callable object.
@@ -157,9 +157,9 @@ public:
     ///              a functor generated via std::bind or a lambda. The signature of the callable
     ///              object must strictly be 'int f(ThreadPromise<RET>::Ptr, ...)'.
     /// @tparam ARGS Argument types passed to FUNC.
-    /// @param[in] queueId Id of the queue where this task should run. Note that the user can specify IQueue::QueueId::Any
+    /// @param[in] queueId Id of the queue where this task should run. Note that the user can specify Queue::Id::Any
     ///                    as a value, which is equivalent to running the simpler version of postAsyncIo() above. Valid range is
-    ///                    [0, numCoroutineThreads) or IQueue::QueueId::Any.
+    ///                    [0, numCoroutineThreads) or Queue::Id::Any.
     /// @param[in] isHighPriority If set to true, the task will be scheduled to run immediately.
     /// @param[in] func Callable object.
     /// @param[in] args Variable list of arguments passed to the callable object.
@@ -309,23 +309,23 @@ public:
     
     /// @brief Returns the total number of queued tasks for the specified type and queue id.
     /// @param[in] type The type of queue.
-    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for IQueue::QueueType::Coro,
-    ///                    [0, numIoThreads) for IQueue::QueueType::IO and IQueue::QueueId::All for either.
+    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for Queue::Type::Coro,
+    ///                    [0, numIoThreads) for Queue::Type::IO and Queue::Id::All for either.
     /// @return The total number of queued tasks including the currently executing one.
-    /// @note IQueue::QueueId::Same is an invalid queue id. IQueue::QueueId::Any is only valid for IO queue type. When
-    ///       type IQueue::QueueType::All is specified, the queueId is not used and must be left at default value.
-    size_t size(IQueue::QueueType type = IQueue::QueueType::All,
-                int queueId = (int)IQueue::QueueId::All) const;
+    /// @note Queue::Id::Same is an invalid queue id. Queue::Id::Any is only valid for IO queue type. When
+    ///       type Queue::Type::All is specified, the queueId is not used and must be left at default value.
+    size_t size(Queue::Type type = Queue::Type::All,
+                int queueId = (int)Queue::Id::All) const;
     
     /// @brief Check if the specified type and queue id is empty (i.e. there are no running tasks)
     /// @param[in] type The type of queue.
-    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for IQueue::QueueType::Coro,
-    ///                    [0, numIoThreads) for IQueue::QueueType::IO and IQueue::QueueId::All for either.
+    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for Queue::Type::Coro,
+    ///                    [0, numIoThreads) for Queue::Type::IO and Queue::Id::All for either.
     /// @return True if empty, false otherwise.
-    /// @note IQueue::QueueId::Same is an invalid queue id. IQueue::QueueId::Any is only valid for IO queue type. When
-    ///       type IQueue::QueueType::All is specified, the queueId is not used and must be left at default value.
-    bool empty(IQueue::QueueType type = IQueue::QueueType::All,
-               int queueId = (int)IQueue::QueueId::All) const;
+    /// @note Queue::Id::Same is an invalid queue id. Queue::Id::Any is only valid for IO queue type. When
+    ///       type Queue::Type::All is specified, the queueId is not used and must be left at default value.
+    bool empty(Queue::Type type = Queue::Type::All,
+               int queueId = (int)Queue::Id::All) const;
     
     /// @brief Drains all queues on this dispatcher object.
     /// @param[in] timeout Maximum time for this function to wait. Set to 0 to wait indefinitely until all queues drain.
@@ -348,20 +348,20 @@ public:
     ///       to a specific queue.
     int getNumIoThreads() const;
 
-    /// @brief Gets the range [minQueueId, maxQueueId] of coroutine queueIds covered by IQueue::QueueId::Any
+    /// @brief Gets the range [minQueueId, maxQueueId] of coroutine queueIds covered by Queue::Id::Any
     /// when using Dispatcher::post
-    /// @return queueIdRange The range of queueIds that IQueue::QueueId::Any covers
+    /// @return queueIdRange The range of queueIds that Queue::Id::Any covers
     const std::pair<int, int>& getCoroQueueIdRangeForAny() const;
     
     /// @brief Returns a statistics object for the specified type and queue id.
     /// @param[in] type The type of queue.
-    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for IQueue::QueueType::Coro,
-    ///                    [0, numIoThreads) for IQueue::QueueType::IO and IQueue::QueueId::All for either.
+    /// @param[in] queueId The queue number to query. Valid range is [0, numCoroutineThreads) for Queue::Type::Coro,
+    ///                    [0, numIoThreads) for Queue::Type::IO and Queue::Id::All for either.
     /// @return Aggregated or individual queue stats.
-    /// @note IQueue::QueueId::Same is an invalid queue id. IQueue::QueueId::Any is only valid for IO queue type. When
-    ///       type IQueue::QueueType::All is specified, the queueId is not used and must be left at default value.
-    QueueStatistics stats(IQueue::QueueType type = IQueue::QueueType::All,
-                          int queueId = (int)IQueue::QueueId::All);
+    /// @note Queue::Id::Same is an invalid queue id. Queue::Id::Any is only valid for IO queue type. When
+    ///       type Queue::Type::All is specified, the queueId is not used and must be left at default value.
+    QueueStatistics stats(Queue::Type type = Queue::Type::All,
+                          int queueId = (int)Queue::Id::All);
     
     /// @brief Resets all coroutine and IO queue counters.
     void resetStats();
@@ -369,7 +369,7 @@ public:
 private:
     template <class RET, class FUNC, class ... ARGS>
     ThreadContextPtr<RET>
-    postImpl(int queueId, bool isHighPriority, ITask::Type type, FUNC&& func, ARGS&&... args);
+    postImpl(int queueId, bool isHighPriority, Task::Type type, FUNC&& func, ARGS&&... args);
     
     template <class RET, class FUNC, class ... ARGS>
     ThreadFuturePtr<RET>

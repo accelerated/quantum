@@ -17,7 +17,7 @@
 #define BLOOMBERG_QUANTUM_ITASK_ACCESSOR_H
 
 #include <memory>
-#include <quantum/interface/quantum_itask.h>
+#include <quantum/quantum_task.h>
 #include <quantum/interface/quantum_iterminate.h>
 
 namespace Bloomberg {
@@ -32,9 +32,9 @@ struct ITaskAccessor : public ITerminate
 {
     using Ptr = std::shared_ptr<ITaskAccessor>;
     
-    virtual void setTask(ITask::Ptr task) = 0;
+    virtual void setTask(CoroTaskPtr task) = 0;
     
-    virtual ITask::Ptr getTask() const = 0;
+    virtual CoroTaskPtr getTask() const = 0;
     
     virtual bool isBlocked() const = 0;
     

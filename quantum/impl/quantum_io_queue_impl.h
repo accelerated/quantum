@@ -89,7 +89,7 @@ void IoQueue::run()
     {
         try
         {
-            ITask::Ptr task;
+            IoTaskPtr task;
             if (_loadBalanceSharedIoQueues)
             {
                 do
@@ -130,9 +130,9 @@ void IoQueue::run()
             int rc = task->run();
             //========================== END TASK ==========================
 
-            if (rc == (int)ITask::RetCode::Success)
+            if (rc == (int)Task::Status::Success)
             {
-                if (task->getQueueId() == (int)IQueue::QueueId::Any)
+                if (task->getQueueId() == (int)Queue::Id::Any)
                 {
                     _stats.incSharedQueueCompletedCount();
                 }
@@ -144,7 +144,7 @@ void IoQueue::run()
             else
             {
                 //IO task ended with error
-                if (task->getQueueId() == (int)IQueue::QueueId::Any)
+                if (task->getQueueId() == (int)Queue::Id::Any)
                 {
                     _stats.incSharedQueueErrorCount();
                 }
@@ -155,7 +155,7 @@ void IoQueue::run()
 
 #ifdef __QUANTUM_PRINT_DEBUG
                 std::lock_guard<std::mutex> guard(Util::LogMutex());
-                if (rc == (int)ITask::RetCode::Exception)
+                if (rc == (int)Task::Status::Exception)
                 {
                     std::cerr << "IO task exited with user exception." << std::endl;
                 }
@@ -185,7 +185,7 @@ void IoQueue::run()
 }
 
 inline
-void IoQueue::enqueue(ITask::Ptr task)
+void IoQueue::enqueue(IoTaskPtr task)
 {
     if (!task)
     {
@@ -197,7 +197,7 @@ void IoQueue::enqueue(ITask::Ptr task)
 }
 
 inline
-bool IoQueue::tryEnqueue(ITask::Ptr task)
+bool IoQueue::tryEnqueue(IoTaskPtr task)
 {
     if (!task)
     {
@@ -213,17 +213,17 @@ bool IoQueue::tryEnqueue(ITask::Ptr task)
 }
 
 inline
-void IoQueue::doEnqueue(ITask::Ptr task)
+void IoQueue::doEnqueue(IoTaskPtr task)
 {
     bool isEmpty = _queue.empty();
     if (task->isHighPriority())
     {
         _stats.incHighPriorityCount();
-        _queue.emplace_front(std::static_pointer_cast<IoTask>(task));
+        _queue.emplace_front(task);
     }
     else
     {
-        _queue.emplace_back(std::static_pointer_cast<IoTask>(task));
+        _queue.emplace_back(task);
     }
     _stats.incPostedCount();
     _stats.incNumElements();
@@ -235,7 +235,7 @@ void IoQueue::doEnqueue(ITask::Ptr task)
 }
 
 inline
-ITask::Ptr IoQueue::dequeue(std::atomic_bool& hint)
+IoTaskPtr IoQueue::dequeue(std::atomic_bool& hint)
 {
     if (_loadBalanceSharedIoQueues)
     {
@@ -247,7 +247,7 @@ ITask::Ptr IoQueue::dequeue(std::atomic_bool& hint)
 }
 
 inline
-ITask::Ptr IoQueue::tryDequeue(std::atomic_bool& hint)
+IoTaskPtr IoQueue::tryDequeue(std::atomic_bool& hint)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_spinlock, SpinLock::TryToLock{});
@@ -259,12 +259,12 @@ ITask::Ptr IoQueue::tryDequeue(std::atomic_bool& hint)
 }
 
 inline
-ITask::Ptr IoQueue::doDequeue(std::atomic_bool& hint)
+IoTaskPtr IoQueue::doDequeue(std::atomic_bool& hint)
 {
     hint = _queue.empty();
     if (!hint)
     {
-        ITask::Ptr task = _queue.front();
+        IoTaskPtr task = _queue.front();
         _queue.pop_front();
         _stats.decNumElements();
         return task;
@@ -273,10 +273,10 @@ ITask::Ptr IoQueue::doDequeue(std::atomic_bool& hint)
 }
 
 inline
-ITask::Ptr IoQueue::tryDequeueFromShared()
+IoTaskPtr IoQueue::tryDequeueFromShared()
 {
     static size_t index = 0;
-    ITask::Ptr task;
+    IoTaskPtr task;
     size_t size = 0;
     
     for (size_t i = 0; i < (*_sharedIoQueues).size(); ++i)
@@ -376,10 +376,10 @@ void IoQueue::signalEmptyCondition(bool value)
 }
 
 inline
-ITask::Ptr IoQueue::grabWorkItem()
+IoTaskPtr IoQueue::grabWorkItem()
 {
     static bool grabFromShared = false;
-    ITask::Ptr task = nullptr;
+    IoTaskPtr task = nullptr;
     grabFromShared = !grabFromShared;
     
     if (grabFromShared) {
@@ -416,10 +416,10 @@ ITask::Ptr IoQueue::grabWorkItem()
 }
 
 inline
-ITask::Ptr IoQueue::grabWorkItemFromAll()
+IoTaskPtr IoQueue::grabWorkItemFromAll()
 {
     static bool grabFromShared = false;
-    ITask::Ptr task = nullptr;
+    IoTaskPtr task = nullptr;
     grabFromShared = !grabFromShared;
     
     if (grabFromShared)

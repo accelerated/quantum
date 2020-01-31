@@ -25,7 +25,7 @@ namespace Bloomberg {
 namespace quantum {
 
 inline
-TaskQueue::WorkItem::WorkItem(TaskPtr task,
+CoroQueue::WorkItem::WorkItem(CoroTaskPtr task,
                               TaskListIter iter,
                               bool isBlocked,
                               unsigned int blockedQueueRound) :
@@ -37,7 +37,7 @@ TaskQueue::WorkItem::WorkItem(TaskPtr task,
 }
 
 inline
-TaskQueue::ProcessTaskResult::ProcessTaskResult(bool isBlocked,
+CoroQueue::ProcessTaskResult::ProcessTaskResult(bool isBlocked,
                                                 unsigned int blockedQueueRound) :
     _isBlocked(isBlocked),
     _blockedQueueRound(blockedQueueRound)
@@ -45,26 +45,26 @@ TaskQueue::ProcessTaskResult::ProcessTaskResult(bool isBlocked,
 }
 
 inline
-TaskQueue::CurrentTaskSetter::CurrentTaskSetter(TaskQueue& taskQueue, const TaskPtr & task) :
+CoroQueue::CurrentTaskSetter::CurrentTaskSetter(CoroQueue& taskQueue, const CoroTaskPtr & task) :
     _taskQueue(taskQueue)
 {
     _taskQueue.setCurrentTask(task.get());
 }
 
 inline
-TaskQueue::CurrentTaskSetter::~CurrentTaskSetter()
+CoroQueue::CurrentTaskSetter::~CurrentTaskSetter()
 {
     _taskQueue.setCurrentTask(nullptr);
 }
     
 inline
-TaskQueue::TaskQueue() :
-    TaskQueue(Configuration(), nullptr)
+CoroQueue::CoroQueue() :
+    CoroQueue(Configuration(), nullptr)
 {
 }
 
 inline
-TaskQueue::TaskQueue(const Configuration&, std::shared_ptr<TaskQueue> sharedQueue) :
+CoroQueue::CoroQueue(const Configuration&, std::shared_ptr<CoroQueue> sharedQueue) :
     _alloc(Allocator<QueueListAllocator>::instance(AllocatorTraits::queueListAllocSize())),
     _runQueue(_alloc),
     _waitQueue(_alloc),
@@ -86,24 +86,24 @@ TaskQueue::TaskQueue(const Configuration&, std::shared_ptr<TaskQueue> sharedQueu
     {
         _sharedQueue->_helpers.push_back(this);
     }
-    _thread = std::make_shared<std::thread>(std::bind(&TaskQueue::run, this));
+    _thread = std::make_shared<std::thread>(std::bind(&CoroQueue::run, this));
 }
 
 inline
-TaskQueue::TaskQueue(const TaskQueue&) :
-    TaskQueue()
+CoroQueue::CoroQueue(const CoroQueue&) :
+    CoroQueue()
 {
 
 }
 
 inline
-TaskQueue::~TaskQueue()
+CoroQueue::~CoroQueue()
 {
     terminate();
 }
 
 inline
-void TaskQueue::pinToCore(int coreId)
+void CoroQueue::pinToCore(int coreId)
 {
 #ifdef _WIN32
     SetThreadAffinityMask(_thread->native_handle(), 1 << coreId);
@@ -121,7 +121,7 @@ void TaskQueue::pinToCore(int coreId)
 
 
 inline
-void TaskQueue::run()
+void CoroQueue::run()
 {
     while (!isInterrupted())
     {
@@ -139,7 +139,7 @@ void TaskQueue::run()
 }
 
 inline
-void TaskQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult)
+void CoroQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult)
 {
     if (mainQueueResult._isBlocked && mainQueueResult._blockedQueueRound != _lastSleptQueueRound)
     {
@@ -148,7 +148,7 @@ void TaskQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult)
     }
 }
 inline
-void TaskQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult,
+void CoroQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult,
                                     const ProcessTaskResult& sharedQueueResult)
 {
     const bool allQueuesEmpty = _isEmpty && _isSharedQueueEmpty;
@@ -172,7 +172,7 @@ void TaskQueue::sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult,
 }
     
 inline
-TaskQueue::ProcessTaskResult TaskQueue::processTask()
+CoroQueue::ProcessTaskResult CoroQueue::processTask()
 {
     WorkItem workItem{nullptr, _runQueue.end(), false, 0};
     try
@@ -180,7 +180,7 @@ TaskQueue::ProcessTaskResult TaskQueue::processTask()
         //Process a task
         workItem = grabWorkItem();
         
-        TaskPtr task = workItem._task;
+        CoroTaskPtr task = workItem._task;
         if (!task)
         {
             return ProcessTaskResult(workItem._isBlocked, workItem._blockedQueueRound);
@@ -197,22 +197,22 @@ TaskQueue::ProcessTaskResult TaskQueue::processTask()
         
         switch (rc)
         {
-            case (int)ITask::RetCode::NotCallable:
+            case (int)Task::Status::NotCallable:
                 handleNotCallable(workItem);
                 break;
-            case (int)ITask::RetCode::AlreadyResumed:
+            case (int)Task::Status::AlreadyResumed:
                 handleAlreadyResumed(workItem);
                 break;
-            case (int)ITask::RetCode::Blocked:
+            case (int)Task::Status::Blocked:
                 handleBlocked(workItem);
                 break;
-            case (int)ITask::RetCode::Sleeping:
+            case (int)Task::Status::Sleeping:
                 handleSleeping(workItem);
                 break;
-            case (int)ITask::RetCode::Running:
+            case (int)Task::Status::Running:
                 handleRunning(workItem);
                 break;
-            case (int)ITask::RetCode::Success:
+            case (int)Task::Status::Success:
                 handleSuccess(workItem);
                 break;
             default:
@@ -232,7 +232,7 @@ TaskQueue::ProcessTaskResult TaskQueue::processTask()
 }
 
 inline
-void TaskQueue::enqueue(ITask::Ptr task)
+void CoroQueue::enqueue(CoroTaskPtr task)
 {
     if (!task)
     {
@@ -244,7 +244,7 @@ void TaskQueue::enqueue(ITask::Ptr task)
 }
 
 inline
-bool TaskQueue::tryEnqueue(ITask::Ptr task)
+bool CoroQueue::tryEnqueue(CoroTaskPtr task)
 {
     if (!task)
     {
@@ -260,7 +260,7 @@ bool TaskQueue::tryEnqueue(ITask::Ptr task)
 }
 
 inline
-void TaskQueue::doEnqueue(ITask::Ptr task)
+void CoroQueue::doEnqueue(CoroTaskPtr task)
 {
     //NOTE: _queueIt remains unchanged following this operation
     _stats.incPostedCount();
@@ -270,13 +270,13 @@ void TaskQueue::doEnqueue(ITask::Ptr task)
     {
         //insert before the current position. If _queueIt == begin(), then the new
         //task will be at the head of the queue.
-        _waitQueue.emplace_front(std::static_pointer_cast<Task>(task));
+        _waitQueue.emplace_front(task);
     }
     else
     {
         //insert after the current position. If next(_queueIt) == end()
         //then the new task will be the last element in the queue
-        _waitQueue.emplace_back(std::static_pointer_cast<Task>(task));
+        _waitQueue.emplace_back(task);
     }
     if (task->isHighPriority())
     {
@@ -290,19 +290,19 @@ void TaskQueue::doEnqueue(ITask::Ptr task)
 }
 
 inline
-ITask::Ptr TaskQueue::dequeue(std::atomic_bool& hint)
+CoroTaskPtr CoroQueue::dequeue(std::atomic_bool& hint)
 {
     return doDequeue(hint, _queueIt);
 }
 
 inline
-ITask::Ptr TaskQueue::tryDequeue(std::atomic_bool& hint)
+CoroTaskPtr CoroQueue::tryDequeue(std::atomic_bool& hint)
 {
     return doDequeue(hint, _queueIt);
 }
 
 inline
-ITask::Ptr TaskQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
+CoroTaskPtr CoroQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -315,7 +315,7 @@ ITask::Ptr TaskQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
         // we don't really know what's the next blocked task in the queue, so reset it
         _blockedIt = _runQueue.end();
     }
-    ITask::Ptr task = *iter;
+    CoroTaskPtr task = *iter;
 
     task->terminate();
     if (_queueIt == iter)
@@ -332,19 +332,19 @@ ITask::Ptr TaskQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
 }
 
 inline
-size_t TaskQueue::size() const
+size_t CoroQueue::size() const
 {
     return _isIdle ? _stats.numElements() : _stats.numElements() + 1;
 }
 
 inline
-bool TaskQueue::empty() const
+bool CoroQueue::empty() const
 {
     return size() == 0;
 }
 
 inline
-void TaskQueue::terminate()
+void CoroQueue::terminate()
 {
     bool value{false};
     if (_terminated.compare_exchange_strong(value, true))
@@ -373,19 +373,19 @@ void TaskQueue::terminate()
 }
 
 inline
-IQueueStatistics& TaskQueue::stats()
+IQueueStatistics& CoroQueue::stats()
 {
     return _stats;
 }
 
 inline
-SpinLock& TaskQueue::getLock()
+SpinLock& CoroQueue::getLock()
 {
     return _waitQueueLock;
 }
 
 inline
-void TaskQueue::signalEmptyCondition(bool value)
+void CoroQueue::signalEmptyCondition(bool value)
 {
     {
         //========================= LOCKED SCOPE =========================
@@ -397,14 +397,14 @@ void TaskQueue::signalEmptyCondition(bool value)
         _notEmptyCond.notify_all();
     }
     // Notify helpers as well
-    for(TaskQueue* helper : _helpers)
+    for(CoroQueue* helper : _helpers)
     {
         helper->signalSharedQueueEmptyCondition(value);
     }
 }
 
 inline
-void TaskQueue::signalSharedQueueEmptyCondition(bool value)
+void CoroQueue::signalSharedQueueEmptyCondition(bool value)
 {
     {
         //========================= LOCKED SCOPE =========================
@@ -418,13 +418,13 @@ void TaskQueue::signalSharedQueueEmptyCondition(bool value)
 }
 
 inline
-bool TaskQueue::handleNotCallable(const WorkItem& workItem)
+bool CoroQueue::handleNotCallable(const WorkItem& workItem)
 {
     return handleError(workItem);
 }
 
 inline
-bool TaskQueue::handleAlreadyResumed(WorkItem& entry)
+bool CoroQueue::handleAlreadyResumed(WorkItem& entry)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -433,7 +433,7 @@ bool TaskQueue::handleAlreadyResumed(WorkItem& entry)
 }
 
 inline
-bool TaskQueue::handleBlocked(WorkItem& entry)
+bool CoroQueue::handleBlocked(WorkItem& entry)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -442,7 +442,7 @@ bool TaskQueue::handleBlocked(WorkItem& entry)
 }
 
 inline
-bool TaskQueue::handleSleeping(WorkItem& entry)
+bool CoroQueue::handleSleeping(WorkItem& entry)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -451,7 +451,7 @@ bool TaskQueue::handleSleeping(WorkItem& entry)
 }
 
 inline
-bool TaskQueue::handleRunning(WorkItem& entry)
+bool CoroQueue::handleRunning(WorkItem& entry)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -460,12 +460,12 @@ bool TaskQueue::handleRunning(WorkItem& entry)
 }
 
 inline
-bool TaskQueue::handleSuccess(const WorkItem& workItem)
+bool CoroQueue::handleSuccess(const WorkItem& workItem)
 {
-    ITaskContinuation::Ptr nextTask;
+    CoroTaskPtr nextTask;
     //check if there's another task scheduled to run after this one
     nextTask = workItem._task->getNextTask();
-    if (nextTask && (nextTask->getType() == ITask::Type::ErrorHandler))
+    if (nextTask && (nextTask->getType() == Task::Type::ErrorHandler))
     {
         //skip error handler since we don't have any errors
         nextTask->terminate(); //invalidate the error handler
@@ -480,9 +480,9 @@ bool TaskQueue::handleSuccess(const WorkItem& workItem)
 }
 
 inline
-bool TaskQueue::handleError(const WorkItem& workItem)
+bool CoroQueue::handleError(const WorkItem& workItem)
 {
-    ITaskContinuation::Ptr nextTask;
+    CoroTaskPtr nextTask;
     //Check if we have a final task to run
     nextTask = workItem._task->getErrorHandlerOrFinalTask();
     //queue next task and de-queue current one
@@ -492,7 +492,7 @@ bool TaskQueue::handleError(const WorkItem& workItem)
     _stats.incErrorCount();
 #ifdef __QUANTUM_PRINT_DEBUG
     std::lock_guard<std::mutex> guard(Util::LogMutex());
-    if (rc == (int)ITask::RetCode::Exception)
+    if (rc == (int)Task::Status::Exception)
     {
         std::cerr << "Coroutine exited with user exception." << std::endl;
     }
@@ -505,7 +505,7 @@ bool TaskQueue::handleError(const WorkItem& workItem)
 }
 
 inline
-bool TaskQueue::handleException(const WorkItem& workItem, const std::exception* ex)
+bool CoroQueue::handleException(const WorkItem& workItem, const std::exception* ex)
 {
     UNUSED(ex);
     doDequeue(_isIdle, workItem._iter);
@@ -522,7 +522,7 @@ bool TaskQueue::handleException(const WorkItem& workItem, const std::exception* 
 }
 
 inline
-bool TaskQueue::isInterrupted()
+bool CoroQueue::isInterrupted()
 {
     if (_isEmpty && _isSharedQueueEmpty)
     {
@@ -535,8 +535,8 @@ bool TaskQueue::isInterrupted()
 }
 
 inline
-TaskQueue::WorkItem
-TaskQueue::grabWorkItem()
+CoroQueue::WorkItem
+CoroQueue::grabWorkItem()
 {    
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
@@ -554,7 +554,7 @@ TaskQueue::grabWorkItem()
 }
 
 inline
-void TaskQueue::onBlockedTask(WorkItem& entry)
+void CoroQueue::onBlockedTask(WorkItem& entry)
 {
     if (_blockedIt == _runQueue.end())
     {
@@ -570,7 +570,7 @@ void TaskQueue::onBlockedTask(WorkItem& entry)
 }
 
 inline
-void TaskQueue::onActiveTask(WorkItem& entry)
+void CoroQueue::onActiveTask(WorkItem& entry)
 {
     _isBlocked = false;
     _blockedIt = _runQueue.end();
@@ -579,19 +579,19 @@ void TaskQueue::onActiveTask(WorkItem& entry)
 }
 
 inline
-bool TaskQueue::isIdle() const
+bool CoroQueue::isIdle() const
 {
     return _isIdle;
 }
 
 inline
-const std::shared_ptr<std::thread>& TaskQueue::getThread() const
+const std::shared_ptr<std::thread>& CoroQueue::getThread() const
 {
     return _thread;
 }
 
 inline
-void TaskQueue::acquireWaiting()
+void CoroQueue::acquireWaiting()
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_waitQueueLock);
@@ -628,19 +628,19 @@ void TaskQueue::acquireWaiting()
 }
 
 inline
-Task*& getCurrentTaskImpl()
+CoroTask*& getCurrentTaskImpl()
 {
-    static thread_local Task* currentTask = nullptr;
+    static thread_local CoroTask* currentTask = nullptr;
     return currentTask;
 }
 
 inline
-Task* TaskQueue::getCurrentTask()
+CoroTask* CoroQueue::getCurrentTask()
 {
     return getCurrentTaskImpl();
 }
 
-inline void TaskQueue::setCurrentTask(Task* task)
+inline void CoroQueue::setCurrentTask(CoroTask* task)
 {
     getCurrentTaskImpl() = task;
 }

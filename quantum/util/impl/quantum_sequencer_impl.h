@@ -40,7 +40,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::Sequencer(Dispatcher& dispatc
     _exceptionCallback(configuration.getExceptionCallback()),
     _taskStats(std::make_shared<SequenceKeyStatisticsWriter>())
 {
-    if (_controllerQueueId <= (int)IQueue::QueueId::Any || _controllerQueueId >= _dispatcher.getNumCoroutineThreads())
+    if (_controllerQueueId <= (int)Queue::Id::Any || _controllerQueueId >= _dispatcher.getNumCoroutineThreads())
     {
         throw std::out_of_range("Allowed range is 0 <= controllerQueueId < _dispatcher.getNumCoroutineThreads()");
     }
@@ -62,7 +62,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueue(
                       false,
                       singleSequenceKeyTaskScheduler<FUNC, ARGS...>,
                       nullptr,
-                      (int)IQueue::QueueId::Any,
+                      (int)Queue::Id::Any,
                       false,
                       *this,
                       SequenceKey(sequenceKey),
@@ -85,7 +85,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueue(
     {
         throw std::runtime_error("Sequencer is disabled");
     }
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid IO queue id");
     }
@@ -117,7 +117,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueue(
                       false,
                       multiSequenceKeyTaskScheduler<FUNC, ARGS...>,
                       nullptr,
-                      (int)IQueue::QueueId::Any,
+                      (int)Queue::Id::Any,
                       false,
                       *this,
                       std::vector<SequenceKey>(sequenceKeys),
@@ -140,7 +140,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueue(
     {
         throw std::runtime_error("Sequencer is disabled");
     }
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid IO queue id");
     }
@@ -169,7 +169,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueueAll(FUNC&& func, ARGS&
                       false,
                       universalTaskScheduler<FUNC, ARGS...>,
                       nullptr,
-                      (int)IQueue::QueueId::Any,
+                      (int)Queue::Id::Any,
                       false,
                       *this,
                       std::forward<FUNC>(func),
@@ -190,7 +190,7 @@ Sequencer<SequenceKey, Hash, KeyEqual, Allocator>::enqueueAll(
     {
         throw std::runtime_error("Sequencer is disabled");
     }
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid IO queue id");
     }

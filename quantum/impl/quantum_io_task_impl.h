@@ -80,7 +80,7 @@ void IoTask::terminate()
 inline
 int IoTask::run()
 {
-    return _func ? _func() : (int)ITask::RetCode::NotCallable;
+    return _func ? _func() : (int)Task::Status::NotCallable;
 }
 
 inline
@@ -96,9 +96,9 @@ int IoTask::getQueueId()
 }
 
 inline
-ITask::Type IoTask::getType() const
+Task::Type IoTask::getType() const
 {
-    return ITask::Type::IO;
+    return Task::Type::IO;
 }
 
 inline

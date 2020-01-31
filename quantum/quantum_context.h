@@ -17,7 +17,7 @@
 #define BLOOMBERG_QUANTUM_CONTEXT_H
 
 #include <quantum/quantum_promise.h>
-#include <quantum/quantum_task.h>
+#include <quantum/quantum_coro_task.h>
 #include <quantum/quantum_io_task.h>
 #include <quantum/quantum_dispatcher_core.h>
 #include <quantum/quantum_traits.h>
@@ -39,7 +39,7 @@ class Context : public IThreadContext<RET>,
                 public std::enable_shared_from_this<Context<RET>>
 {
     friend struct Util;
-    friend class Task;
+    friend class CoroTask;
     friend class Dispatcher;
     template <class OTHER_RET> friend class Context;
     
@@ -61,8 +61,8 @@ public:
     //===================================
     //         ITASKACCESSOR
     //===================================
-    void setTask(ITask::Ptr task) final;
-    ITask::Ptr getTask() const final;
+    void setTask(CoroTaskPtr task) final;
+    CoroTaskPtr getTask() const final;
     bool isBlocked() const final;
     bool isSleeping(bool updateTimer = false) final;
 
@@ -311,11 +311,11 @@ private:
     
     template <class OTHER_RET, class FUNC, class ... ARGS>
     typename Context<OTHER_RET>::Ptr
-    thenImpl(ITask::Type type, FUNC&& func, ARGS&&... args);
+    thenImpl(Task::Type type, FUNC&& func, ARGS&&... args);
 
     template <class OTHER_RET, class FUNC, class ... ARGS>
     typename Context<OTHER_RET>::Ptr
-    postImpl(int queueId, bool isHighPriority, ITask::Type type, FUNC&& func, ARGS&&... args);
+    postImpl(int queueId, bool isHighPriority, Task::Type type, FUNC&& func, ARGS&&... args);
     
     template <class OTHER_RET, class FUNC, class ... ARGS>
     CoroFuturePtr<OTHER_RET>
@@ -323,18 +323,18 @@ private:
     
     int index(int num) const;
     
-    void validateTaskType(ITask::Type type) const; //throws
+    void validateTaskType(Task::Type type) const; //throws
     
     void validateContext(ICoroSync::Ptr sync) const; //throws
     
     //Members
-    ITask::Ptr                          _task;
-    std::vector<IPromiseBase::Ptr>      _promises;
-    DispatcherCore*                     _dispatcher;
-    std::atomic_bool                    _terminated;
-    std::atomic_int                     _signal;
-    Traits::Yield*                      _yield;
-    std::chrono::microseconds           _sleepDuration;
+    CoroTaskPtr                          _task;
+    std::vector<IPromiseBase::Ptr>         _promises;
+    DispatcherCore*                        _dispatcher;
+    std::atomic_bool                       _terminated;
+    std::atomic_int                        _signal;
+    Traits::Yield*                         _yield;
+    std::chrono::microseconds              _sleepDuration;
     std::chrono::steady_clock::time_point  _sleepTimestamp;
 };
 

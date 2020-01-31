@@ -17,7 +17,7 @@
 #define BLOOMBERG_QUANTUM_IO_TASK_H
 
 #include <functional>
-#include <quantum/interface/quantum_itask.h>
+#include <quantum/quantum_task.h>
 #include <quantum/quantum_capture.h>
 #include <quantum/quantum_promise.h>
 #include <quantum/util/quantum_util.h>
@@ -31,7 +31,7 @@ namespace quantum {
 /// @class IoTask.
 /// @brief Long running or blocking task running in the IO thread pool.
 /// @note For internal use only.
-class IoTask : public ITask
+class IoTask : public ITerminate
 {
 public:
     using Ptr = std::shared_ptr<IoTask>;
@@ -64,14 +64,14 @@ public:
     void terminate() final;
     
     //ITask
-    int run() final;
-    void setQueueId(int queueId) final;
-    int getQueueId() final;
-    Type getType() const final;
-    bool isBlocked() const final;
-    bool isSleeping(bool updateTimer = false) final;
-    bool isHighPriority() const final;
-    bool isSuspended() const final;
+    int run();
+    void setQueueId(int queueId);
+    int getQueueId();
+    Task::Type getType() const;
+    bool isBlocked() const;
+    bool isSleeping(bool updateTimer = false);
+    bool isHighPriority() const;
+    bool isSuspended() const;
     
     //===================================
     //           NEW / DELETE
@@ -87,7 +87,7 @@ private:
     bool                    _isHighPriority;
 };
 
-using IoTaskPtr = IoTask::Ptr;
+using IoTaskPtr = IoTaskPtr;
 using IoTaskWeakPtr = IoTask::WeakPtr;
 
 }}

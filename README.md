@@ -11,12 +11,12 @@
 * Highly parallelized coroutine framework for CPU-bound workloads.
 * Support for long-running or blocking IO tasks.
 * Allows explicit and implicit cooperative yielding between coroutines.
-* Task continuations and coroutine chaining for serializing work execution.
+* CoroTask continuations and coroutine chaining for serializing work execution.
 * Synchronous and asynchronous dispatching using futures and promises similar to STL.
 * Support for _streaming futures_ which allows faster processing of large data sets.
 * Support for _future references_.
 * Cascading execution output during task continuations (a.k.a. _past_ futures).
-* Task prioritization.
+* CoroTask prioritization.
 * Internal error handling and exception forwarding.
 * Ability to write lock-free code by synchronizing coroutines on dedicated queues.
 * Coroutine-friendly mutexes and condition variables for locking critical code paths or synchronizing access to external objects.

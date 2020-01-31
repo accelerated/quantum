@@ -13,8 +13,8 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-#ifndef BLOOMBERG_QUANTUM_TASK_QUEUE_H
-#define BLOOMBERG_QUANTUM_TASK_QUEUE_H
+#ifndef BLOOMBERG_QUANTUM_CORO_QUEUE_H
+#define BLOOMBERG_QUANTUM_CORO_QUEUE_H
 
 #include <list>
 #include <atomic>
@@ -25,11 +25,10 @@
 #include <thread>
 #include <pthread.h>
 #include <iostream>
-#include <quantum/interface/quantum_itask_continuation.h>
+#include <quantum/quantum_queue.h>
 #include <quantum/interface/quantum_iterminate.h>
-#include <quantum/interface/quantum_iqueue.h>
 #include <quantum/quantum_spinlock.h>
-#include <quantum/quantum_task.h>
+#include <quantum/quantum_coro_task.h>
 #include <quantum/quantum_yielding_thread.h>
 #include <quantum/quantum_queue_statistics.h>
 #include <quantum/quantum_configuration.h>
@@ -38,87 +37,86 @@ namespace Bloomberg {
 namespace quantum {
 
 //==============================================================================================
-//                                 class TaskQueue
+//                                 class CoroQueue
 //==============================================================================================
-/// @class TaskQueue.
+/// @class CoroQueue.
 /// @brief Thread queue for running coroutines.
 /// @note For internal use only.
-class TaskQueue : public IQueue
+class CoroQueue : public ITerminate
 {
 public:
-    using TaskList = std::list<Task::Ptr, ContiguousPoolManager<ITask::Ptr>>;
+    using TaskList = std::list<CoroTaskPtr, ContiguousPoolManager<CoroTaskPtr>>;
     using TaskListIter = TaskList::iterator;
     
-    TaskQueue();
+    CoroQueue();
     
-    TaskQueue(const Configuration& config,
-              std::shared_ptr<TaskQueue> sharedQueue);
+    CoroQueue(const Configuration& config,
+              std::shared_ptr<CoroQueue> sharedQueue);
     
-    TaskQueue(const TaskQueue& other);
+    CoroQueue(const CoroQueue& other);
     
-    TaskQueue(TaskQueue&& other) = default;
+    CoroQueue(CoroQueue&& other) = default;
     
-    ~TaskQueue();
+    ~CoroQueue();
     
-    void pinToCore(int coreId) final;
+    void pinToCore(int coreId);
     
-    void run() final;
+    void run();
     
-    void enqueue(ITask::Ptr task) final;
+    void enqueue(CoroTaskPtr task);
     
-    bool tryEnqueue(ITask::Ptr task) final;
+    bool tryEnqueue(CoroTaskPtr task);
     
-    ITask::Ptr dequeue(std::atomic_bool& hint) final;
+    CoroTaskPtr dequeue(std::atomic_bool& hint);
     
-    ITask::Ptr tryDequeue(std::atomic_bool& hint) final;
+    CoroTaskPtr tryDequeue(std::atomic_bool& hint);
     
-    size_t size() const final;
+    size_t size() const;
     
-    bool empty() const final;
+    bool empty() const;
     
     void terminate() final;
     
-    IQueueStatistics& stats() final;
+    IQueueStatistics& stats();
     
-    SpinLock& getLock() final;
+    SpinLock& getLock();
     
-    void signalEmptyCondition(bool value) final;
+    void signalEmptyCondition(bool value);
     
-    bool isIdle() const final;
+    bool isIdle() const;
     
-    const std::shared_ptr<std::thread>& getThread() const final;
+    const std::shared_ptr<std::thread>& getThread() const;
 
-    static Task* getCurrentTask();
+    static CoroTask* getCurrentTask();
 
-    static void setCurrentTask(Task* task);
+    static void setCurrentTask(CoroTask* task);
 
 private:
     struct WorkItem
     {
-        WorkItem(TaskPtr task,
+        WorkItem(CoroTaskPtr task,
                  TaskListIter iter,
                  bool isBlocked,
                  unsigned int blockedQueueRound);
         
-        TaskPtr _task;                   // task pointer
-        TaskListIter _iter;              // task iterator
-        bool _isBlocked;                 // true if the entire queue is blocked
-        unsigned int _blockedQueueRound; // blocked queue round id
+        CoroTaskPtr         _task;              // task pointer
+        TaskListIter    _iter;              // task iterator
+        bool            _isBlocked;         // true if the entire queue is blocked
+        unsigned int    _blockedQueueRound; // blocked queue round id
     };
     struct ProcessTaskResult
     {
         ProcessTaskResult(bool isBlocked,
                           unsigned int blockedQueueRound);
-            
         bool _isBlocked;                 // true if the entire queue is blocked
         unsigned int _blockedQueueRound; // blocked queue round id
     };
     struct CurrentTaskSetter
     {
-        CurrentTaskSetter(TaskQueue& taskQueue, const TaskPtr & task);
+        CurrentTaskSetter(CoroQueue& taskQueue, const CoroTaskPtr & task);
         ~CurrentTaskSetter();
 
-        TaskQueue& _taskQueue;
+        CoroQueue& _taskQueue;
     };
     //Coroutine result handlers
     bool handleNotCallable(const WorkItem& entry);
@@ -138,9 +136,9 @@ private:
     void signalSharedQueueEmptyCondition(bool value);
     ProcessTaskResult processTask();
     WorkItem grabWorkItem();
-    void doEnqueue(ITask::Ptr task);
-    ITask::Ptr doDequeue(std::atomic_bool& hint,
-                         TaskListIter iter);
+    void doEnqueue(CoroTaskPtr task);
+    CoroTaskPtr doDequeue(std::atomic_bool& hint,
+                            TaskListIter iter);
     void acquireWaiting();
     void sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult);
     void sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult,
@@ -165,8 +163,8 @@ private:
     std::atomic_bool                    _terminated;
     bool                                _isAdvanced;
     QueueStatistics                     _stats;
-    std::shared_ptr<TaskQueue>          _sharedQueue;
-    std::vector<TaskQueue*>             _helpers;
+    std::shared_ptr<CoroQueue>          _sharedQueue;
+    std::vector<CoroQueue*>             _helpers;
     unsigned int                        _queueRound;
     unsigned int                        _lastSleptQueueRound;
     unsigned int                        _lastSleptSharedQueueRound;
@@ -174,6 +172,6 @@ private:
 
 }}
 
-#include <quantum/impl/quantum_task_queue_impl.h>
+#include <quantum/impl/quantum_coro_queue_impl.h>
 
-#endif //BLOOMBERG_QUANTUM_TASK_QUEUE_H
+#endif //BLOOMBERG_QUANTUM_CORO_QUEUE_H

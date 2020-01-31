@@ -28,11 +28,8 @@
 #include <quantum/interface/quantum_ifuture.h>
 #include <quantum/interface/quantum_ipromise.h>
 #include <quantum/interface/quantum_ipromise_base.h>
-#include <quantum/interface/quantum_iqueue.h>
 #include <quantum/interface/quantum_iqueue_statistics.h>
-#include <quantum/interface/quantum_itask.h>
 #include <quantum/interface/quantum_itask_accessor.h>
-#include <quantum/interface/quantum_itask_continuation.h>
 #include <quantum/interface/quantum_iterminate.h>
 #include <quantum/interface/quantum_ithread_context.h>
 #include <quantum/interface/quantum_ithread_context_base.h>
@@ -47,6 +44,8 @@
 #include <quantum/quantum_configuration.h>
 #include <quantum/quantum_context.h>
 #include <quantum/quantum_contiguous_pool_manager.h>
+#include <quantum/quantum_coro_queue.h>
+#include <quantum/quantum_coro_task.h>
 #include <quantum/quantum_coroutine_pool_allocator.h>
 #include <quantum/quantum_dispatcher.h>
 #include <quantum/quantum_dispatcher_core.h>
@@ -59,6 +58,7 @@
 #include <quantum/quantum_macros.h>
 #include <quantum/quantum_mutex.h>
 #include <quantum/quantum_promise.h>
+#include <quantum/quantum_queue.h>
 #include <quantum/quantum_queue_statistics.h>
 #include <quantum/quantum_read_write_spinlock.h>
 #include <quantum/quantum_shared_state.h>
@@ -66,7 +66,6 @@
 #include <quantum/quantum_stack_allocator.h>
 #include <quantum/quantum_stack_traits.h>
 #include <quantum/quantum_task.h>
-#include <quantum/quantum_task_queue.h>
 #include <quantum/quantum_thread_traits.h>
 #include <quantum/quantum_traits.h>
 #include <quantum/quantum_yielding_thread.h>

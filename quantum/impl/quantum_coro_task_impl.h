@@ -26,22 +26,22 @@ namespace quantum {
 
 #ifndef __QUANTUM_USE_DEFAULT_ALLOCATOR
     #ifdef __QUANTUM_ALLOCATE_POOL_FROM_HEAP
-        using TaskAllocator = HeapAllocator<Task>;
+        using TaskAllocator = HeapAllocator<CoroTask>;
     #else
-        using TaskAllocator = StackAllocator<Task, __QUANTUM_TASK_ALLOC_SIZE>;
+        using TaskAllocator = StackAllocator<CoroTask, __QUANTUM_TASK_ALLOC_SIZE>;
     #endif
 #else
-    using TaskAllocator = StlAllocator<Task>;
+    using TaskAllocator = StlAllocator<CoroTask>;
 #endif
 
 template <class RET, class FUNC, class ... ARGS>
-Task::Task(std::false_type,
-           std::shared_ptr<Context<RET>> ctx,
-           int queueId,
-           bool isHighPriority,
-           ITask::Type type,
-           FUNC&& func,
-           ARGS&&... args) :
+CoroTask::CoroTask(std::false_type,
+                   std::shared_ptr<Context<RET>> ctx,
+                   int queueId,
+                   bool isHighPriority,
+                   Task::Type type,
+                   FUNC&& func,
+                   ARGS&&... args) :
     _coroContext(ctx),
     _coro(Allocator<CoroStackAllocator>::instance(AllocatorTraits::defaultCoroPoolAllocSize()),
           Util::bindCaller(ctx, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
@@ -54,13 +54,13 @@ Task::Task(std::false_type,
 {}
 
 template <class RET, class FUNC, class ... ARGS>
-Task::Task(std::true_type,
-           std::shared_ptr<Context<RET>> ctx,
-           int queueId,
-           bool isHighPriority,
-           ITask::Type type,
-           FUNC&& func,
-           ARGS&&... args) :
+CoroTask::CoroTask(std::true_type,
+                   std::shared_ptr<Context<RET>> ctx,
+                   int queueId,
+                   bool isHighPriority,
+                   Task::Type type,
+                   FUNC&& func,
+                   ARGS&&... args) :
     _coroContext(ctx),
     _coro(Allocator<CoroStackAllocator>::instance(AllocatorTraits::defaultCoroPoolAllocSize()),
           Util::bindCaller2(ctx, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
@@ -73,13 +73,13 @@ Task::Task(std::true_type,
 {}
 
 inline
-Task::~Task()
+CoroTask::~CoroTask()
 {
     terminate();
 }
 
 inline
-void Task::terminate()
+void CoroTask::terminate()
 {
     bool value{false};
     if (_terminated.compare_exchange_strong(value, true))
@@ -89,25 +89,25 @@ void Task::terminate()
 }
 
 inline
-int Task::run()
+int CoroTask::run()
 {
     SuspensionGuard guard(_suspendedState);
     if (guard)
     {
         if (!_coro)
         {
-            return (int)ITask::RetCode::NotCallable;
+            return (int)Task::Status::NotCallable;
         }
         if (isBlocked())
         {
-            return (int)ITask::RetCode::Blocked;
+            return (int)Task::Status::Blocked;
         }
         if (isSleeping(true))
         {
-            return (int)ITask::RetCode::Sleeping;
+            return (int)Task::Status::Sleeping;
         }
         
-        int rc = (int)ITask::RetCode::Running;
+        int rc = (int)Task::Status::Running;
         _coro(rc);
         if (!_coro)
         {
@@ -115,53 +115,53 @@ int Task::run()
         }
         return rc;
     }
-    return (int)ITask::RetCode::AlreadyResumed;
+    return (int)Task::Status::AlreadyResumed;
 }
 
 inline
-void Task::setQueueId(int queueId)
+void CoroTask::setQueueId(int queueId)
 {
     _queueId = queueId;
 }
 
 inline
-int Task::getQueueId()
+int CoroTask::getQueueId()
 {
     return _queueId;
 }
 
 inline
-ITask::Type Task::getType() const { return _type; }
+Task::Type CoroTask::getType() const { return _type; }
 
 inline
-ITaskContinuation::Ptr Task::getNextTask() { return _next; }
+CoroTaskPtr CoroTask::getNextTask() { return _next; }
 
 inline
-void Task::setNextTask(ITaskContinuation::Ptr nextTask) { _next = nextTask; }
+void CoroTask::setNextTask(CoroTaskPtr nextTask) { _next = nextTask; }
 
 inline
-ITaskContinuation::Ptr Task::getPrevTask() { return _prev.lock(); }
+CoroTaskPtr CoroTask::getPrevTask() { return _prev.lock(); }
 
 inline
-void Task::setPrevTask(ITaskContinuation::Ptr prevTask) { _prev = prevTask; }
+void CoroTask::setPrevTask(CoroTaskPtr prevTask) { _prev = prevTask; }
 
 inline
-ITaskContinuation::Ptr Task::getFirstTask()
+CoroTaskPtr CoroTask::getFirstTask()
 {
-    return (_type == Type::First) ? shared_from_this() : getPrevTask()->getFirstTask();
+    return (_type == Task::Type::First) ? shared_from_this() : getPrevTask()->getFirstTask();
 }
 
 inline
-ITaskContinuation::Ptr Task::getErrorHandlerOrFinalTask()
+CoroTaskPtr CoroTask::getErrorHandlerOrFinalTask()
 {
-    if ((_type == Type::ErrorHandler) || (_type == Type::Final))
+    if ((_type == Task::Type::ErrorHandler) || (_type == Task::Type::Final))
     {
         return shared_from_this();
     }
     else if (_next)
     {
-        ITaskContinuation::Ptr task = _next->getErrorHandlerOrFinalTask();
-        if ((_next->getType() != Type::ErrorHandler) && (_next->getType() != Type::Final))
+        CoroTaskPtr task = _next->getErrorHandlerOrFinalTask();
+        if ((_next->getType() != Task::Type::ErrorHandler) && (_next->getType() != Task::Type::Final))
         {
             _next->terminate();
             _next.reset(); //release next task
@@ -172,55 +172,55 @@ ITaskContinuation::Ptr Task::getErrorHandlerOrFinalTask()
 }
 
 inline
-bool Task::isBlocked() const
+bool CoroTask::isBlocked() const
 {
     return _coroContext ? _coroContext->isBlocked() : false; //coroutine is waiting on some signal
 }
 
 inline
-bool Task::isSleeping(bool updateTimer)
+bool CoroTask::isSleeping(bool updateTimer)
 {
     return _coroContext ? _coroContext->isSleeping(updateTimer) : false; //coroutine is sleeping
 }
 
 inline
-bool Task::isHighPriority() const
+bool CoroTask::isHighPriority() const
 {
     return _isHighPriority;
 }
 
 inline
-bool Task::isSuspended() const
+bool CoroTask::isSuspended() const
 {
     return _suspendedState == (int)State::Suspended;
 }
 
 inline
-Task::CoroLocalStorage& Task::getCoroLocalStorage()
+CoroTask::CoroLocalStorage& CoroTask::getCoroLocalStorage()
 {
     return _coroLocalStorage;
 }
 
 inline
-ITaskAccessor::Ptr Task::getTaskAccessor() const
+ITaskAccessor::Ptr CoroTask::getTaskAccessor() const
 {
     return _coroContext;
 }
 
 inline
-void* Task::operator new(size_t)
+void* CoroTask::operator new(size_t)
 {
     return Allocator<TaskAllocator>::instance(AllocatorTraits::taskAllocSize()).allocate();
 }
 
 inline
-void Task::operator delete(void* p)
+void CoroTask::operator delete(void* p)
 {
-    Allocator<TaskAllocator>::instance(AllocatorTraits::taskAllocSize()).deallocate(static_cast<Task*>(p));
+    Allocator<TaskAllocator>::instance(AllocatorTraits::taskAllocSize()).deallocate(static_cast<CoroTask*>(p));
 }
 
 inline
-void Task::deleter(Task* p)
+void CoroTask::deleter(CoroTask* p)
 {
 #ifndef __QUANTUM_USE_DEFAULT_ALLOCATOR
     Allocator<TaskAllocator>::instance(AllocatorTraits::taskAllocSize()).dispose(p);

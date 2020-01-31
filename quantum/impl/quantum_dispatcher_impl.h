@@ -44,9 +44,9 @@ Dispatcher::post(FUNC&& func,
                  ARGS&&... args)->ThreadContextPtr<decltype(coroResult(func))>
 {
     using Ret = decltype(coroResult(func));
-    return postImpl<Ret>((int)IQueue::QueueId::Any,
+    return postImpl<Ret>((int)Queue::Id::Any,
                          false,
-                         ITask::Type::Standalone,
+                         Task::Type::Standalone,
                          std::forward<FUNC>(func),
                          std::forward<ARGS>(args)...);
 }
@@ -57,9 +57,9 @@ Dispatcher::post2(FUNC&& func,
                   ARGS&&... args)->ThreadContextPtr<decltype(resultOf2(func))>
 {
     using Ret = decltype(resultOf2(func));
-    return postImpl<Ret>((int)IQueue::QueueId::Any,
+    return postImpl<Ret>((int)Queue::Id::Any,
                           false,
-                          ITask::Type::Standalone,
+                          Task::Type::Standalone,
                           std::forward<FUNC>(func),
                           std::forward<ARGS>(args)...);
 }
@@ -74,7 +74,7 @@ Dispatcher::post(int queueId,
     using Ret = decltype(coroResult(func));
     return postImpl<Ret>(queueId,
                          isHighPriority,
-                         ITask::Type::Standalone,
+                         Task::Type::Standalone,
                          std::forward<FUNC>(func),
                          std::forward<ARGS>(args)...);
 }
@@ -89,7 +89,7 @@ Dispatcher::post2(int queueId,
     using Ret = decltype(resultOf2(func));
     return postImpl<Ret>(queueId,
                           isHighPriority,
-                          ITask::Type::Standalone,
+                          Task::Type::Standalone,
                           std::forward<FUNC>(func),
                           std::forward<ARGS>(args)...);
 }
@@ -100,8 +100,8 @@ Dispatcher::postFirst(FUNC&& func,
                       ARGS&&... args)->ThreadContextPtr<decltype(coroResult(func))>
 {
     using Ret = decltype(coroResult(func));
-    return postImpl<Ret>((int)IQueue::QueueId::Any,
-                         false, ITask::Type::First,
+    return postImpl<Ret>((int)Queue::Id::Any,
+                         false, Task::Type::First,
                          std::forward<FUNC>(func),
                          std::forward<ARGS>(args)...);
 }
@@ -112,9 +112,9 @@ Dispatcher::postFirst2(FUNC&& func,
                        ARGS&&... args)->ThreadContextPtr<decltype(resultOf2(func))>
 {
     using Ret = decltype(resultOf2(func));
-    return postImpl<Ret>((int)IQueue::QueueId::Any,
+    return postImpl<Ret>((int)Queue::Id::Any,
                           false,
-                          ITask::Type::First,
+                          Task::Type::First,
                           std::forward<FUNC>(func),
                           std::forward<ARGS>(args)...);
 }
@@ -129,7 +129,7 @@ Dispatcher::postFirst(int queueId,
     using Ret = decltype(coroResult(func));
     return postImpl<Ret>(queueId,
                          isHighPriority,
-                         ITask::Type::First,
+                         Task::Type::First,
                          std::forward<FUNC>(func),
                          std::forward<ARGS>(args)...);
 }
@@ -144,7 +144,7 @@ Dispatcher::postFirst2(int queueId,
     using Ret = decltype(resultOf2(func));
     return postImpl<Ret>(queueId,
                           isHighPriority,
-                          ITask::Type::First,
+                          Task::Type::First,
                           std::forward<FUNC>(func),
                           std::forward<ARGS>(args)...);
 }
@@ -155,7 +155,7 @@ Dispatcher::postAsyncIo(FUNC&& func,
                         ARGS&&... args)->ThreadFuturePtr<decltype(ioResult(func))>
 {
     using Ret = decltype(ioResult(func));
-    return postAsyncIoImpl<Ret>((int)IQueue::QueueId::Any,
+    return postAsyncIoImpl<Ret>((int)Queue::Id::Any,
                                 false,
                                 std::forward<FUNC>(func),
                                 std::forward<ARGS>(args)...);
@@ -167,7 +167,7 @@ Dispatcher::postAsyncIo2(FUNC&& func,
                          ARGS&&... args)->ThreadFuturePtr<decltype(resultOf2(func))>
 {
     using Ret = decltype(resultOf2(func));
-    return postAsyncIoImpl<Ret>((int)IQueue::QueueId::Any,
+    return postAsyncIoImpl<Ret>((int)Queue::Id::Any,
                                  false, std::forward<FUNC>(func),
                                  std::forward<ARGS>(args)...);
 }
@@ -338,14 +338,14 @@ void Dispatcher::terminate()
 }
 
 inline
-size_t Dispatcher::size(IQueue::QueueType type,
+size_t Dispatcher::size(Queue::Type type,
                         int queueId) const
 {
     return _dispatcher.size(type, queueId);
 }
 
 inline
-bool Dispatcher::empty(IQueue::QueueType type,
+bool Dispatcher::empty(Queue::Type type,
                        int queueId) const
 {
     return _dispatcher.empty(type, queueId);
@@ -402,7 +402,7 @@ const std::pair<int, int>& Dispatcher::getCoroQueueIdRangeForAny() const
 }
 
 inline
-QueueStatistics Dispatcher::stats(IQueue::QueueType type,
+QueueStatistics Dispatcher::stats(Queue::Type type,
                                   int queueId)
 {
     return _dispatcher.stats(type, queueId);
@@ -418,7 +418,7 @@ template <class RET, class FUNC, class ... ARGS>
 ThreadContextPtr<RET>
 Dispatcher::postImpl(int queueId,
                      bool isHighPriority,
-                     ITask::Type type,
+                     Task::Type type,
                      FUNC&& func,
                      ARGS&&... args)
 {
@@ -427,22 +427,22 @@ Dispatcher::postImpl(int queueId,
     {
         throw std::runtime_error("Posting is disabled");
     }
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid coroutine queue id");
     }
     auto ctx = ContextPtr<RET>(new Context<RET>(_dispatcher),
                                Context<RET>::deleter);
-    auto task = Task::Ptr(new Task(Traits::IsVoidContext<FirstArg>{},
+    auto task = CoroTaskPtr(new CoroTask(Traits::IsVoidContext<FirstArg>{},
                                    ctx,
                                    queueId,
                                    isHighPriority,
                                    type,
                                    std::forward<FUNC>(func),
                                    std::forward<ARGS>(args)...),
-                          Task::deleter);
+                          CoroTask::deleter);
     ctx->setTask(task);
-    if (type == ITask::Type::Standalone)
+    if (type == Task::Type::Standalone)
     {
         _dispatcher.post(task);
     }
@@ -461,12 +461,12 @@ Dispatcher::postAsyncIoImpl(int queueId,
     {
         throw std::runtime_error("Posting is disabled");
     }
-    if (queueId < (int)IQueue::QueueId::Any)
+    if (queueId < (int)Queue::Id::Any)
     {
         throw std::runtime_error("Invalid IO queue id");
     }
     auto promise = PromisePtr<RET>(new Promise<RET>(), Promise<RET>::deleter);
-    auto task = IoTask::Ptr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
+    auto task = IoTaskPtr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
                                        promise,
                                        queueId,
                                        isHighPriority,

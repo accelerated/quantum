@@ -24,7 +24,7 @@
 #include <vector>
 #include <iterator>
 #include <quantum/quantum_traits.h>
-#include <quantum/interface/quantum_itask.h>
+#include <quantum/quantum_task.h>
 #include <quantum/interface/quantum_icontext.h>
 #include <quantum/interface/quantum_ipromise.h>
 #include <quantum/quantum_capture.h>
