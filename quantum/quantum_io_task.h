@@ -34,9 +34,6 @@ namespace quantum {
 class IoTask : public ITerminate
 {
 public:
-    using Ptr = std::shared_ptr<IoTask>;
-    using WeakPtr = std::weak_ptr<IoTask>;
-    
     template <class RET, class FUNC, class ... ARGS>
     IoTask(std::true_type,
            std::shared_ptr<Promise<RET>> promise,
@@ -77,18 +74,14 @@ public:
     //           NEW / DELETE
     //===================================
     static void* operator new(size_t size);
+    static void* operator new(size_t size, void*);
     static void operator delete(void* p);
     static void deleter(IoTask* p);
-    
 private:
     Function<int()>         _func;      //the current runnable io function
-    std::atomic_bool        _terminated;
     int                     _queueId;
     bool                    _isHighPriority;
 };
-
-using IoTaskPtr = IoTask::Ptr;
-using IoTaskWeakPtr = IoTask::WeakPtr;
 
 }}
 

@@ -39,11 +39,6 @@ struct IThreadPromise : public Traits::DerivedFrom<PROMISE<T>,
     using Ptr = std::shared_ptr<IThreadPromise<PROMISE, T>>;
     using Impl = PROMISE<T>;
     
-    /// @brief Constructor.
-    /// @param[in] derived A pointer to the concrete implementation of this class.
-    /// @note The constructor parameter is only used for template deduction at compile time.
-    IThreadPromise(Impl* derived){ UNUSED(derived); }
-    
     /// @brief Get the associated thread future.
     /// @return An interface to the associated future object sharing a common state.
     virtual ThreadFuturePtr<T> getIThreadFuture() const = 0;

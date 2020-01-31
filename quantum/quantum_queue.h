@@ -91,7 +91,7 @@ void Queue::setThreadName(Queue::Type type,
         using IoQueueListAllocator = HeapAllocator<IoTaskPtr>;
     #else
         using QueueListAllocator = StackAllocator<CoroTaskPtr, __QUANTUM_QUEUE_LIST_ALLOC_SIZE>;
-        using IoQueueListAllocator = StackAllocator<IoTaskPtr, __QUANTUM_IO_QUEUE_LIST_ALLOC_SIZE>;
+        using IoQueueListAllocator = StackAllocator<IoTask, __QUANTUM_IO_QUEUE_LIST_ALLOC_SIZE>;
     #endif
 #else
     using QueueListAllocator = StlAllocator<ITask::Ptr>;

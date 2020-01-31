@@ -56,6 +56,7 @@
 #include <quantum/quantum_io_task.h>
 #include <quantum/quantum_local.h>
 #include <quantum/quantum_macros.h>
+#include <quantum/quantum_maybe.h>
 #include <quantum/quantum_mutex.h>
 #include <quantum/quantum_promise.h>
 #include <quantum/quantum_queue.h>

@@ -48,7 +48,6 @@ CoroTask::CoroTask(std::false_type,
     _queueId(queueId),
     _isHighPriority(isHighPriority),
     _type(type),
-    _terminated(false),
     _suspendedState((int)State::Suspended),
     _coroLocalStorage()
 {}
@@ -67,7 +66,6 @@ CoroTask::CoroTask(std::true_type,
     _queueId(queueId),
     _isHighPriority(isHighPriority),
     _type(type),
-    _terminated(false),
     _suspendedState((int)State::Suspended),
     _coroLocalStorage()
 {}

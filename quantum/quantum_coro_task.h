@@ -144,8 +144,7 @@ private:
     bool                        _isHighPriority;
     Ptr                         _next; //CoroTask scheduled to run after current completes.
     WeakPtr                     _prev; //Previous task in the chain
-    Task::Type                 _type;
-    std::atomic_bool            _terminated;
+    Task::Type                  _type;
     std::atomic_int             _suspendedState; // stores values of State
     CoroLocalStorage            _coroLocalStorage; // local storage of the coroutine
 };

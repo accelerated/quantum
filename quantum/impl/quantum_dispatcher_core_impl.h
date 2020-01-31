@@ -27,8 +27,7 @@ DispatcherCore::DispatcherCore(const Configuration& config) :
     _sharedCoroAnyQueue(config.getCoroutineSharingForAny() ? std::make_shared<CoroQueue>(config, nullptr): nullptr),
     _sharedIoQueues((config.getNumIoThreads() <= 0) ? 1 : config.getNumIoThreads(), IoQueue(config, nullptr)),
     _ioQueues((config.getNumIoThreads() <= 0) ? 1 : config.getNumIoThreads(), IoQueue(config, &_sharedIoQueues)),
-    _loadBalanceSharedIoQueues(false),
-    _terminated(false)
+    _loadBalanceSharedIoQueues(false)
 {
     const int coroCount = (config.getNumCoroutineThreads() == -1) ? std::thread::hardware_concurrency() :
         (config.getNumCoroutineThreads() == 0) ? 1 : config.getNumCoroutineThreads();
@@ -414,21 +413,16 @@ void DispatcherCore::post(CoroTaskPtr task)
 }
 
 inline
-void DispatcherCore::postAsyncIo(IoTaskPtr task)
+void DispatcherCore::postAsyncIo(IoTask&& task)
 {
-    if (!task)
-    {
-        return;
-    }
-    
-    if (task->getQueueId() == (int)Queue::Id::Any)
+    if (task.getQueueId() == (int)Queue::Id::Any)
     {
         if (_loadBalanceSharedIoQueues)
         {
             static size_t index = 0;
             //loop until we can find an queue that won't block
             while (1) {
-                if (_sharedIoQueues.at(++index % _sharedIoQueues.size()).tryEnqueue(task)) {
+                if (_sharedIoQueues.at(++index % _sharedIoQueues.size()).tryEnqueue(std::move(task))) {
                     break;
                 }
             }
@@ -436,7 +430,7 @@ void DispatcherCore::postAsyncIo(IoTaskPtr task)
         else
         {
             //insert the task into the shared queue
-            _sharedIoQueues[0].enqueue(task);
+            _sharedIoQueues[0].enqueue(std::move(task));
         
             //Signal all threads there is work to do
             for (auto&& queue : _ioQueues)
@@ -447,13 +441,12 @@ void DispatcherCore::postAsyncIo(IoTaskPtr task)
     }
     else
     {
-        if (task->getQueueId() >= (int)_ioQueues.size())
+        if (task.getQueueId() >= (int)_ioQueues.size())
         {
             throw std::runtime_error("Queue id out of bounds");
         }
-        
         //Run on specific queue
-        _ioQueues.at(task->getQueueId()).enqueue(task);
+        _ioQueues.at(task.getQueueId()).enqueue(std::move(task));
     }
 }
 

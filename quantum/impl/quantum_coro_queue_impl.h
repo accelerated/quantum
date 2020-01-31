@@ -75,7 +75,6 @@ CoroQueue::CoroQueue(const Configuration&, std::shared_ptr<CoroQueue> sharedQueu
     _isSharedQueueEmpty(true),
     _isInterrupted(false),
     _isIdle(true),
-    _terminated(false),
     _isAdvanced(false),
     _sharedQueue(sharedQueue),
     _queueRound(0),

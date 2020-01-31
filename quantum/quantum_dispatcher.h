@@ -378,7 +378,6 @@ private:
     //Members
     DispatcherCore              _dispatcher;
     std::atomic_bool            _drain;
-    std::atomic_bool            _terminated;
 };
 
 using TaskDispatcher = Dispatcher; //alias

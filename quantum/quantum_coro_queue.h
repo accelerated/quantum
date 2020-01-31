@@ -160,7 +160,6 @@ private:
     std::atomic_bool                    _isSharedQueueEmpty;
     std::atomic_bool                    _isInterrupted;
     std::atomic_bool                    _isIdle;
-    std::atomic_bool                    _terminated;
     bool                                _isAdvanced;
     QueueStatistics                     _stats;
     std::shared_ptr<CoroQueue>          _sharedQueue;

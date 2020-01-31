@@ -41,7 +41,6 @@ IoTask::IoTask(std::true_type,
                FUNC&& func,
                ARGS&&... args) :
     _func(Util::bindIoCaller(promise, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
-    _terminated(false),
     _queueId(queueId),
     _isHighPriority(isHighPriority)
 {
@@ -55,7 +54,6 @@ IoTask::IoTask(std::false_type,
                FUNC&& func,
                ARGS&&... args) :
     _func(Util::bindIoCaller2(promise, std::forward<FUNC>(func), std::forward<ARGS>(args)...)),
-    _terminated(false),
     _queueId(queueId),
     _isHighPriority(isHighPriority)
 {
@@ -129,6 +127,12 @@ inline
 void* IoTask::operator new(size_t)
 {
     return Allocator<IoTaskAllocator>::instance(AllocatorTraits::ioTaskAllocSize()).allocate();
+}
+
+inline
+void* IoTask::operator new(size_t, void* storage)
+{
+    return storage;
 }
 
 inline

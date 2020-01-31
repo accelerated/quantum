@@ -41,8 +41,7 @@ IoQueue::IoQueue(const Configuration& config,
     _queue(Allocator<IoQueueListAllocator>::instance(AllocatorTraits::ioQueueListAllocSize())),
     _isEmpty(true),
     _isInterrupted(false),
-    _isIdle(true),
-    _terminated(false)
+    _isIdle(true)
 {
     if (_sharedIoQueues) {
         //The shared queue doesn't have its own thread
@@ -52,6 +51,7 @@ IoQueue::IoQueue(const Configuration& config,
 
 inline
 IoQueue::IoQueue(const IoQueue& other) :
+    ITerminate(other),
     _sharedIoQueues(other._sharedIoQueues),
     _loadBalanceSharedIoQueues(other._loadBalanceSharedIoQueues),
     _loadBalancePollIntervalMs(other._loadBalancePollIntervalMs),
@@ -61,8 +61,7 @@ IoQueue::IoQueue(const IoQueue& other) :
     _queue(Allocator<IoQueueListAllocator>::instance(AllocatorTraits::ioQueueListAllocSize())),
     _isEmpty(true),
     _isInterrupted(false),
-    _isIdle(true),
-    _terminated(false)
+    _isIdle(true)
 {
     if (_sharedIoQueues) {
         //The shared queue doesn't have its own thread
@@ -77,19 +76,13 @@ IoQueue::~IoQueue()
 }
 
 inline
-void IoQueue::pinToCore(int)
-{
-    //Not used
-}
-
-inline
 void IoQueue::run()
 {
     while (true)
     {
         try
         {
-            IoTaskPtr task;
+            Maybe<IoTask> task;
             if (_loadBalanceSharedIoQueues)
             {
                 do
@@ -127,12 +120,12 @@ void IoQueue::run()
             }
             
             //========================= START TASK =========================
-            int rc = task->run();
+            int rc = task.value().run();
             //========================== END TASK ==========================
 
             if (rc == (int)Task::Status::Success)
             {
-                if (task->getQueueId() == (int)Queue::Id::Any)
+                if (task.value().getQueueId() == (int)Queue::Id::Any)
                 {
                     _stats.incSharedQueueCompletedCount();
                 }
@@ -144,7 +137,7 @@ void IoQueue::run()
             else
             {
                 //IO task ended with error
-                if (task->getQueueId() == (int)Queue::Id::Any)
+                if (task.value().getQueueId() == (int)Queue::Id::Any)
                 {
                     _stats.incSharedQueueErrorCount();
                 }
@@ -185,45 +178,37 @@ void IoQueue::run()
 }
 
 inline
-void IoQueue::enqueue(IoTaskPtr task)
+void IoQueue::enqueue(IoTask&& task)
 {
-    if (!task)
-    {
-        return; //nothing to do
-    }
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_spinlock);
-    doEnqueue(task);
+    doEnqueue(std::move(task));
 }
 
 inline
-bool IoQueue::tryEnqueue(IoTaskPtr task)
+bool IoQueue::tryEnqueue(IoTask&& task)
 {
-    if (!task)
-    {
-        return false; //nothing to do
-    }
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_spinlock, SpinLock::TryToLock{});
     if (lock.ownsLock())
     {
-        doEnqueue(task);
+        doEnqueue(std::move(task));
     }
     return lock.ownsLock();
 }
 
 inline
-void IoQueue::doEnqueue(IoTaskPtr task)
+void IoQueue::doEnqueue(IoTask&& task)
 {
     bool isEmpty = _queue.empty();
-    if (task->isHighPriority())
+    if (task.isHighPriority())
     {
         _stats.incHighPriorityCount();
-        _queue.emplace_front(task);
+        _queue.emplace_front(std::move(task));
     }
     else
     {
-        _queue.emplace_back(task);
+        _queue.emplace_back(std::move(task));
     }
     _stats.incPostedCount();
     _stats.incNumElements();
@@ -235,7 +220,7 @@ void IoQueue::doEnqueue(IoTaskPtr task)
 }
 
 inline
-IoTaskPtr IoQueue::dequeue(std::atomic_bool& hint)
+Maybe<IoTask> IoQueue::dequeue(std::atomic_bool& hint)
 {
     if (_loadBalanceSharedIoQueues)
     {
@@ -247,7 +232,7 @@ IoTaskPtr IoQueue::dequeue(std::atomic_bool& hint)
 }
 
 inline
-IoTaskPtr IoQueue::tryDequeue(std::atomic_bool& hint)
+Maybe<IoTask> IoQueue::tryDequeue(std::atomic_bool& hint)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_spinlock, SpinLock::TryToLock{});
@@ -255,35 +240,34 @@ IoTaskPtr IoQueue::tryDequeue(std::atomic_bool& hint)
     {
         return doDequeue(hint);
     }
-    return nullptr;
+    return {};
 }
 
 inline
-IoTaskPtr IoQueue::doDequeue(std::atomic_bool& hint)
+Maybe<IoTask> IoQueue::doDequeue(std::atomic_bool& hint)
 {
     hint = _queue.empty();
     if (!hint)
     {
-        IoTaskPtr task = _queue.front();
+        Maybe<IoTask> task = std::move(_queue.front());
         _queue.pop_front();
         _stats.decNumElements();
         return task;
     }
-    return nullptr;
+    return {};
 }
 
 inline
-IoTaskPtr IoQueue::tryDequeueFromShared()
+Maybe<IoTask> IoQueue::tryDequeueFromShared()
 {
     static size_t index = 0;
-    IoTaskPtr task;
     size_t size = 0;
     
     for (size_t i = 0; i < (*_sharedIoQueues).size(); ++i)
     {
         IoQueue& queue = (*_sharedIoQueues)[++index % (*_sharedIoQueues).size()];
         size += queue.size();
-        task = queue.tryDequeue(_isIdle);
+        Maybe<IoTask> task = queue.tryDequeue(_isIdle);
         if (task)
         {
             return task;
@@ -294,7 +278,7 @@ IoTaskPtr IoQueue::tryDequeueFromShared()
         //try again
         return tryDequeueFromShared();
     }
-    return nullptr;
+    return {};
 }
 
 inline
@@ -376,12 +360,11 @@ void IoQueue::signalEmptyCondition(bool value)
 }
 
 inline
-IoTaskPtr IoQueue::grabWorkItem()
+Maybe<IoTask> IoQueue::grabWorkItem()
 {
     static bool grabFromShared = false;
-    IoTaskPtr task = nullptr;
+    Maybe<IoTask> task;
     grabFromShared = !grabFromShared;
-    
     if (grabFromShared) {
         //========================= LOCKED SCOPE (SHARED QUEUE) =========================
         SpinLock::Guard lock((*_sharedIoQueues)[0].getLock());
@@ -416,12 +399,11 @@ IoTaskPtr IoQueue::grabWorkItem()
 }
 
 inline
-IoTaskPtr IoQueue::grabWorkItemFromAll()
+Maybe<IoTask> IoQueue::grabWorkItemFromAll()
 {
     static bool grabFromShared = false;
-    IoTaskPtr task = nullptr;
+    Maybe<IoTask> task;
     grabFromShared = !grabFromShared;
-    
     if (grabFromShared)
     {
         task = tryDequeueFromShared();

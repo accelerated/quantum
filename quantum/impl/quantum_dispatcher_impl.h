@@ -27,8 +27,7 @@ namespace quantum {
 inline
 Dispatcher::Dispatcher(const Configuration& config) :
     _dispatcher(config),
-    _drain(false),
-    _terminated(false)
+    _drain(false)
 {}
 
 inline
@@ -466,14 +465,12 @@ Dispatcher::postAsyncIoImpl(int queueId,
         throw std::runtime_error("Invalid IO queue id");
     }
     auto promise = PromisePtr<RET>(new Promise<RET>(), Promise<RET>::deleter);
-    auto task = IoTaskPtr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
-                                       promise,
-                                       queueId,
-                                       isHighPriority,
-                                       std::forward<FUNC>(func),
-                                       std::forward<ARGS>(args)...),
-                            IoTask::deleter);
-    _dispatcher.postAsyncIo(task);
+    _dispatcher.postAsyncIo(IoTask{Traits::IsThreadPromise<FirstArg>{},
+                                   promise,
+                                   queueId,
+                                   isHighPriority,
+                                   std::forward<FUNC>(func),
+                                   std::forward<ARGS>(args)...});
     return promise->getIThreadFuture();
 }
 

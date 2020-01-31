@@ -27,6 +27,7 @@
 #include <quantum/quantum_io_task.h>
 #include <quantum/quantum_queue_statistics.h>
 #include <quantum/quantum_configuration.h>
+#include <quantum/quantum_maybe.h>
 
 namespace Bloomberg {
 namespace quantum {
@@ -40,7 +41,7 @@ namespace quantum {
 class IoQueue : public ITerminate
 {
 public:
-    using TaskList = std::list<IoTaskPtr, IoQueueListAllocator>;
+    using TaskList = std::list<IoTask, IoQueueListAllocator>;
     using TaskListIter = TaskList::iterator;
     
     IoQueue();
@@ -56,17 +57,15 @@ public:
     
     void terminate() final;
     
-    void pinToCore(int coreId);
-    
     void run();
     
-    void enqueue(IoTaskPtr task);
+    void enqueue(IoTask&& task);
     
-    bool tryEnqueue(IoTaskPtr task);
+    bool tryEnqueue(IoTask&& task);
     
-    IoTaskPtr dequeue(std::atomic_bool& hint);
+    Maybe<IoTask> dequeue(std::atomic_bool& hint);
     
-    IoTaskPtr tryDequeue(std::atomic_bool& hint);
+    Maybe<IoTask> tryDequeue(std::atomic_bool& hint);
     
     size_t size() const;
     
@@ -83,11 +82,11 @@ public:
     const std::shared_ptr<std::thread>& getThread() const;
     
 private:
-    IoTaskPtr grabWorkItem();
-    IoTaskPtr grabWorkItemFromAll();
-    void doEnqueue(IoTaskPtr task);
-    IoTaskPtr doDequeue(std::atomic_bool& hint);
-    IoTaskPtr tryDequeueFromShared();
+    Maybe<IoTask> grabWorkItem();
+    Maybe<IoTask> grabWorkItemFromAll();
+    void doEnqueue(IoTask&& task);
+    Maybe<IoTask> doDequeue(std::atomic_bool& hint);
+    Maybe<IoTask> tryDequeueFromShared();
     std::chrono::milliseconds getBackoffInterval();
     
     //async IO queue
@@ -105,7 +104,6 @@ private:
     std::atomic_bool                _isEmpty;
     std::atomic_bool                _isInterrupted;
     std::atomic_bool                _isIdle;
-    std::atomic_bool                _terminated;
     QueueStatistics                 _stats;
 };
 

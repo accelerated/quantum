@@ -29,7 +29,14 @@ namespace quantum {
 ///        to be explicitly disposed of before their destructors are called.
 struct ITerminate
 {
-    /// @brief Virtual destructor. This function is explicitly left empty.
+    /// @brief Constructors
+    ITerminate() = default;
+    ITerminate(const ITerminate& other);
+    ITerminate(ITerminate&& other);
+    ITerminate& operator=(const ITerminate& other);
+    ITerminate& operator=(ITerminate&& other);
+    
+    /// @brief Virtual destructor.
     virtual ~ITerminate() = default;
     
     /// @brief Terminates the object.
@@ -37,7 +44,7 @@ struct ITerminate
     virtual void terminate() = 0;
     
     //==============================================================================================
-    //                                 class ITerminate::Guard
+    //                                 class Terminate::Guard
     //==============================================================================================
     /// @class ITerminate::Guard
     /// @brief RAII-style mechanism for ensuring an object is terminated at the end of a scope.
@@ -54,6 +61,9 @@ struct ITerminate
     private:
         ITerminate& _object;
     };
+    
+protected:
+    std::atomic_bool _terminated{false};
 };
 
 }}

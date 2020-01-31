@@ -626,7 +626,6 @@ template <class RET>
 Context<RET>::Context(DispatcherCore& dispatcher) :
     _promises(1, PromisePtr<RET>(new Promise<RET>(), Promise<RET>::deleter)),
     _dispatcher(&dispatcher),
-    _terminated(false),
     _signal(-1),
     _yield(nullptr),
     _sleepDuration(0)
@@ -637,7 +636,6 @@ template <class OTHER_RET>
 Context<RET>::Context(Context<OTHER_RET>& other) :
     _promises(other._promises),
     _dispatcher(other._dispatcher),
-    _terminated(false),
     _signal(-1),
     _yield(nullptr),
     _sleepDuration(0)
@@ -983,14 +981,12 @@ Context<RET>::postAsyncIoImpl(int queueId, bool isHighPriority, FUNC&& func, ARG
         throw std::runtime_error("Invalid coroutine queue id");
     }
     auto promise = PromisePtr<OTHER_RET>(new Promise<OTHER_RET>(), Promise<OTHER_RET>::deleter);
-    auto task = IoTaskPtr(new IoTask(Traits::IsThreadPromise<FirstArg>{},
-                                       promise,
-                                       queueId,
-                                       isHighPriority,
-                                       std::forward<FUNC>(func),
-                                       std::forward<ARGS>(args)...),
-                            IoTask::deleter);
-    _dispatcher->postAsyncIo(task);
+    _dispatcher->postAsyncIo(IoTask{Traits::IsThreadPromise<FirstArg>{},
+                             promise,
+                             queueId,
+                             isHighPriority,
+                             std::forward<FUNC>(func),
+                             std::forward<ARGS>(args)...});
     return promise->getICoroFuture();
 }
 

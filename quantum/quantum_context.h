@@ -328,10 +328,9 @@ private:
     void validateContext(ICoroSync::Ptr sync) const; //throws
     
     //Members
-    CoroTaskPtr                          _task;
+    CoroTaskPtr                            _task;
     std::vector<IPromiseBase::Ptr>         _promises;
     DispatcherCore*                        _dispatcher;
-    std::atomic_bool                       _terminated;
     std::atomic_int                        _signal;
     Traits::Yield*                         _yield;
     std::chrono::microseconds              _sleepDuration;

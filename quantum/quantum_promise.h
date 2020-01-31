@@ -41,22 +41,10 @@ public:
     Promise();
     
     //Move constructor
-    Promise(Promise<T>&& other) :
-        IThreadPromise<Promise, T>(this),
-        ICoroPromise<Promise, T>(this),
-        _sharedState(std::move(other._sharedState)),
-        _terminated(other._terminated.load()){
-    }
+    Promise(Promise<T>&& other) = default;
     
     //Move assignment
-    Promise& operator=(Promise<T>&& other)
-    {
-        if (this != &other) {
-            _sharedState = std::move(other._sharedState);
-            _terminated = other._terminated.load();
-        }
-        return *this;
-    }
+    Promise& operator=(Promise<T>&& other) = default;
     
     //Destructor
     ~Promise();
@@ -100,7 +88,6 @@ public:
     
 private:
     std::shared_ptr<SharedState<T>> _sharedState;
-    std::atomic_bool                _terminated;
 };
 
 template <class T>

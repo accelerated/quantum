@@ -86,10 +86,7 @@ int ICoroPromise<PROMISE, T>::closeBuffer()
 
 template <class T>
 Promise<T>::Promise() :
-    IThreadPromise<Promise, T>(this),
-    ICoroPromise<Promise, T>(this),
-    _sharedState(new SharedState<T>()),
-    _terminated(false)
+    _sharedState(new SharedState<T>())
 {}
 
 template <class T>

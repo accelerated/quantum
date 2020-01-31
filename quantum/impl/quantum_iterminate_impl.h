@@ -23,6 +23,33 @@ namespace Bloomberg {
 namespace quantum {
 
 inline
+ITerminate::ITerminate(const ITerminate& other)
+{
+    *this = other;
+}
+
+inline
+ITerminate::ITerminate(ITerminate&& other)
+{
+    *this = other;
+}
+
+inline
+ITerminate& ITerminate::operator=(const ITerminate& other)
+{
+    if (this != &other) {
+        _terminated.store(other._terminated.load());
+    }
+    return *this;
+}
+
+inline
+ITerminate& ITerminate::operator=(ITerminate&& other)
+{
+    return *this = other;
+}
+
+inline
 ITerminate::Guard::Guard(ITerminate& object) :
     _object(object)
 {}
