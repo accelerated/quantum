@@ -87,7 +87,7 @@ private:
     bool                    _isHighPriority;
 };
 
-using IoTaskPtr = IoTaskPtr;
+using IoTaskPtr = IoTask::Ptr;
 using IoTaskWeakPtr = IoTask::WeakPtr;
 
 }}

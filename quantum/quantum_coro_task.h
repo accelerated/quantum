@@ -150,7 +150,7 @@ private:
     CoroLocalStorage            _coroLocalStorage; // local storage of the coroutine
 };
 
-using CoroTaskPtr = CoroTaskPtr;
+using CoroTaskPtr = CoroTask::Ptr;
 using CoroTaskWeakPtr = CoroTask::WeakPtr;
 
 }}

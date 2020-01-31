@@ -21,11 +21,6 @@
 namespace Bloomberg {
 namespace quantum {
 
-class CoroTask;
-using CoroTaskPtr = std::shared_ptr<CoroTask>;
-class IoTask;
-using IoTaskPtr = std::shared_ptr<IoTask>;
-
 //==============================================================================================
 //                                   Task
 //==============================================================================================
@@ -49,6 +44,12 @@ struct Task
         Max = (int)Running-10,                      ///< Value of the max reserved return code
     };
 };
+
+//Name forwarding
+class CoroTask;
+using CoroTaskPtr = std::shared_ptr<CoroTask>;
+class IoTask;
+using IoTaskPtr = std::shared_ptr<IoTask>;
 
 }}
 
