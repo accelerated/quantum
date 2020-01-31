@@ -25,6 +25,7 @@
 #include <thread>
 #include <pthread.h>
 #include <iostream>
+#include <quantum/quantum_maybe.h>
 #include <quantum/quantum_queue.h>
 #include <quantum/interface/quantum_iterminate.h>
 #include <quantum/quantum_spinlock.h>
@@ -45,7 +46,7 @@ namespace quantum {
 class CoroQueue : public ITerminate
 {
 public:
-    using TaskList = std::list<CoroTaskPtr, ContiguousPoolManager<CoroTaskPtr>>;
+    using TaskList = std::list<CoroTask, ContiguousPoolManager<CoroTask>>;
     using TaskListIter = TaskList::iterator;
     
     CoroQueue();
@@ -63,13 +64,13 @@ public:
     
     void run();
     
-    void enqueue(CoroTaskPtr task);
+    void enqueue(CoroTask&& task);
     
-    bool tryEnqueue(CoroTaskPtr task);
+    bool tryEnqueue(CoroTask&& task);
     
-    CoroTaskPtr dequeue(std::atomic_bool& hint);
+    void dequeue(std::atomic_bool& hint);
     
-    CoroTaskPtr tryDequeue(std::atomic_bool& hint);
+    void tryDequeue(std::atomic_bool& hint);
     
     size_t size() const;
     
@@ -87,6 +88,7 @@ public:
     
     const std::shared_ptr<std::thread>& getThread() const;
 
+    // Coroutine local API
     static CoroTask* getCurrentTask();
 
     static void setCurrentTask(CoroTask* task);
@@ -94,12 +96,12 @@ public:
 private:
     struct WorkItem
     {
-        WorkItem(CoroTaskPtr task,
+        WorkItem(CoroTask* task,
                  TaskListIter iter,
                  bool isBlocked,
                  unsigned int blockedQueueRound);
         
-        CoroTaskPtr         _task;              // task pointer
+        CoroTask*       _task;              // task pointer
         TaskListIter    _iter;              // task iterator
         bool            _isBlocked;         // true if the entire queue is blocked
         unsigned int    _blockedQueueRound; // blocked queue round id
@@ -108,12 +110,12 @@ private:
     {
         ProcessTaskResult(bool isBlocked,
                           unsigned int blockedQueueRound);
-        bool _isBlocked;                 // true if the entire queue is blocked
-        unsigned int _blockedQueueRound; // blocked queue round id
+        bool            _isBlocked;         // true if the entire queue is blocked
+        unsigned int    _blockedQueueRound; // blocked queue round id
     };
     struct CurrentTaskSetter
     {
-        CurrentTaskSetter(CoroQueue& taskQueue, const CoroTaskPtr & task);
+        CurrentTaskSetter(CoroQueue& taskQueue, CoroTask* task);
         ~CurrentTaskSetter();
 
         CoroQueue& _taskQueue;
@@ -136,9 +138,9 @@ private:
     void signalSharedQueueEmptyCondition(bool value);
     ProcessTaskResult processTask();
     WorkItem grabWorkItem();
-    void doEnqueue(CoroTaskPtr task);
-    CoroTaskPtr doDequeue(std::atomic_bool& hint,
-                            TaskListIter iter);
+    void doEnqueue(CoroTask&& task);
+    void doDequeue(std::atomic_bool& hint,
+                   TaskListIter iter);
     void acquireWaiting();
     void sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult);
     void sleepOnBlockedQueue(const ProcessTaskResult& mainQueueResult,

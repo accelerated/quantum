@@ -47,7 +47,7 @@ struct Task
 
 //Name forwarding
 class CoroTask;
-using CoroTaskPtr = std::shared_ptr<CoroTask>;
+using CoroTaskPtr = std::unique_ptr<CoroTask>;
 class IoTask;
 using IoTaskPtr = std::shared_ptr<IoTask>;
 

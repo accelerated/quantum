@@ -249,7 +249,7 @@ Maybe<IoTask> IoQueue::doDequeue(std::atomic_bool& hint)
     hint = _queue.empty();
     if (!hint)
     {
-        Maybe<IoTask> task = std::move(_queue.front());
+        IoTask task = std::move(_queue.front());
         _queue.pop_front();
         _stats.decNumElements();
         return task;

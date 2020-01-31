@@ -36,12 +36,11 @@ namespace quantum {
 /// @class CoroTask.
 /// @brief Runnable object representing a coroutine.
 /// @note For internal use only.
-class CoroTask : public ITerminate,
-                 public std::enable_shared_from_this<CoroTask>
+class CoroTask : public ITerminate
 {
 public:
-    using Ptr = std::shared_ptr<CoroTask>;
-    using WeakPtr = std::weak_ptr<CoroTask>;
+    using Ptr = std::unique_ptr<CoroTask>;
+    using RawPtr = CoroTask*;
     
     enum class State : int { Running, Suspended, Terminated };
 
@@ -85,10 +84,10 @@ public:
     bool isSuspended() const;
     
     Ptr getNextTask();
-    void setNextTask(Ptr nextTask);
-    Ptr getPrevTask();
-    void setPrevTask(Ptr prevTask);
-    Ptr getFirstTask();
+    void setNextTask(Ptr&& nextTask);
+    RawPtr getPrevTask();
+    void setPrevTask(RawPtr prevTask);
+    RawPtr getFirstTask();
     
     //Returns a final or error handler task in the chain and in the process frees all
     //the subsequent continuation tasks
@@ -143,14 +142,14 @@ private:
     int                         _queueId;
     bool                        _isHighPriority;
     Ptr                         _next; //CoroTask scheduled to run after current completes.
-    WeakPtr                     _prev; //Previous task in the chain
+    RawPtr                      _prev; //Previous task in the chain
     Task::Type                  _type;
     std::atomic_int             _suspendedState; // stores values of State
     CoroLocalStorage            _coroLocalStorage; // local storage of the coroutine
 };
 
 using CoroTaskPtr = CoroTask::Ptr;
-using CoroTaskWeakPtr = CoroTask::WeakPtr;
+using CoroTaskRawPtr = CoroTask::RawPtr;
 
 }}
 

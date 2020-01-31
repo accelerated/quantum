@@ -126,8 +126,11 @@ public:
     void reset() {
         if (_isSet) {
             value().~T();
-            _isSet = false;
+            release();
         }
+    }
+    void release() {
+        _isSet = false;
     }
 private:
     typename std::aligned_storage<sizeof(T), alignof(T)>::type _storage;

@@ -839,7 +839,7 @@ Context<RET>::thenImpl(Task::Type type, FUNC&& func, ARGS&&... args)
                                    std::forward<FUNC>(func),
                                    std::forward<ARGS>(args)...),
                           CoroTask::deleter);
-    ctx->setTask(task);
+    ctx->setTask(task.get());
     
     //Chain tasks
     _task->setNextTask(task);

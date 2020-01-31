@@ -25,7 +25,7 @@ namespace Bloomberg {
 namespace quantum {
 
 inline
-CoroQueue::WorkItem::WorkItem(CoroTaskPtr task,
+CoroQueue::WorkItem::WorkItem(CoroTask* task,
                               TaskListIter iter,
                               bool isBlocked,
                               unsigned int blockedQueueRound) :
@@ -45,10 +45,11 @@ CoroQueue::ProcessTaskResult::ProcessTaskResult(bool isBlocked,
 }
 
 inline
-CoroQueue::CurrentTaskSetter::CurrentTaskSetter(CoroQueue& taskQueue, const CoroTaskPtr & task) :
+CoroQueue::CurrentTaskSetter::CurrentTaskSetter(CoroQueue& taskQueue,
+                                                CoroTask* task) :
     _taskQueue(taskQueue)
 {
-    _taskQueue.setCurrentTask(task.get());
+    _taskQueue.setCurrentTask(task);
 }
 
 inline
@@ -179,7 +180,7 @@ CoroQueue::ProcessTaskResult CoroQueue::processTask()
         //Process a task
         workItem = grabWorkItem();
         
-        CoroTaskPtr task = workItem._task;
+        CoroTask* task = workItem._task;
         if (!task)
         {
             return ProcessTaskResult(workItem._isBlocked, workItem._blockedQueueRound);
@@ -231,53 +232,45 @@ CoroQueue::ProcessTaskResult CoroQueue::processTask()
 }
 
 inline
-void CoroQueue::enqueue(CoroTaskPtr task)
+void CoroQueue::enqueue(CoroTask&& task)
 {
-    if (!task)
-    {
-        return; //nothing to do
-    }
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_waitQueueLock);
-    doEnqueue(task);
+    doEnqueue(std::move(task));
 }
 
 inline
-bool CoroQueue::tryEnqueue(CoroTaskPtr task)
+bool CoroQueue::tryEnqueue(CoroTask&& task)
 {
-    if (!task)
-    {
-        return false; //nothing to do
-    }
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_waitQueueLock, SpinLock::TryToLock{});
     if (lock.ownsLock())
     {
-        doEnqueue(task);
+        doEnqueue(std::move(task));
     }
     return lock.ownsLock();
 }
 
 inline
-void CoroQueue::doEnqueue(CoroTaskPtr task)
+void CoroQueue::doEnqueue(CoroTask&& task)
 {
     //NOTE: _queueIt remains unchanged following this operation
     _stats.incPostedCount();
     _stats.incNumElements();
     bool isEmpty = _waitQueue.empty();
-    if (task->isHighPriority())
+    if (task.isHighPriority())
     {
         //insert before the current position. If _queueIt == begin(), then the new
         //task will be at the head of the queue.
-        _waitQueue.emplace_front(task);
+        _waitQueue.emplace_front(std::move(task));
     }
     else
     {
         //insert after the current position. If next(_queueIt) == end()
         //then the new task will be the last element in the queue
-        _waitQueue.emplace_back(task);
+        _waitQueue.emplace_back(std::move(task));
     }
-    if (task->isHighPriority())
+    if (task.isHighPriority())
     {
         _stats.incHighPriorityCount();
     }
@@ -289,34 +282,32 @@ void CoroQueue::doEnqueue(CoroTaskPtr task)
 }
 
 inline
-CoroTaskPtr CoroQueue::dequeue(std::atomic_bool& hint)
+void CoroQueue::dequeue(std::atomic_bool& hint)
 {
-    return doDequeue(hint, _queueIt);
+    doDequeue(hint, _queueIt);
 }
 
 inline
-CoroTaskPtr CoroQueue::tryDequeue(std::atomic_bool& hint)
+void CoroQueue::tryDequeue(std::atomic_bool& hint)
 {
-    return doDequeue(hint, _queueIt);
+    doDequeue(hint, _queueIt);
 }
 
 inline
-CoroTaskPtr CoroQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
+void CoroQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
 {
     //========================= LOCKED SCOPE =========================
     SpinLock::Guard lock(_runQueueLock);
     if (iter == _runQueue.end())
     {
-        return nullptr;
+        return;
     }
     if (iter == _blockedIt)
     {
         // we don't really know what's the next blocked task in the queue, so reset it
         _blockedIt = _runQueue.end();
     }
-    CoroTaskPtr task = *iter;
-
-    task->terminate();
+    iter->terminate();
     if (_queueIt == iter)
     {
         _queueIt = _runQueue.erase(iter);
@@ -327,7 +318,6 @@ CoroTaskPtr CoroQueue::doDequeue(std::atomic_bool&, TaskListIter iter)
         _runQueue.erase(iter);
     }
     _stats.decNumElements();
-    return task;
 }
 
 inline
@@ -471,7 +461,7 @@ bool CoroQueue::handleSuccess(const WorkItem& workItem)
         nextTask = nextTask->getNextTask();
     }
     //queue next task and de-queue current one
-    enqueue(nextTask);
+    enqueue(std::move(*nextTask));
     doDequeue(_isIdle, workItem._iter);
     //Coroutine ended normally with "return 0" statement
     _stats.incCompletedCount();
@@ -485,7 +475,7 @@ bool CoroQueue::handleError(const WorkItem& workItem)
     //Check if we have a final task to run
     nextTask = workItem._task->getErrorHandlerOrFinalTask();
     //queue next task and de-queue current one
-    enqueue(nextTask);
+    enqueue(std::move(*nextTask));
     doDequeue(_isIdle, workItem._iter);
     //Coroutine ended with explicit user error
     _stats.incErrorCount();
@@ -549,7 +539,7 @@ CoroQueue::grabWorkItem()
     {
         return WorkItem(nullptr, _runQueue.end(), _isBlocked, _queueRound);
     }
-    return WorkItem((*_queueIt), _queueIt, false, 0);
+    return WorkItem(&(*_queueIt), _queueIt, false, 0);
 }
 
 inline

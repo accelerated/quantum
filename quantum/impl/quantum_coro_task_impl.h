@@ -132,41 +132,36 @@ inline
 Task::Type CoroTask::getType() const { return _type; }
 
 inline
-CoroTaskPtr CoroTask::getNextTask() { return _next; }
+CoroTaskPtr CoroTask::getNextTask() { return std::move(_next); }
 
 inline
-void CoroTask::setNextTask(CoroTaskPtr nextTask) { _next = nextTask; }
+void CoroTask::setNextTask(CoroTaskPtr&& nextTask) { _next = std::move(nextTask); }
 
 inline
-CoroTaskPtr CoroTask::getPrevTask() { return _prev.lock(); }
+CoroTaskRawPtr CoroTask::getPrevTask() { return _prev; }
 
 inline
-void CoroTask::setPrevTask(CoroTaskPtr prevTask) { _prev = prevTask; }
+void CoroTask::setPrevTask(RawPtr prevTask) { _prev = prevTask; }
 
 inline
-CoroTaskPtr CoroTask::getFirstTask()
+CoroTaskRawPtr CoroTask::getFirstTask()
 {
-    return (_type == Task::Type::First) ? shared_from_this() : getPrevTask()->getFirstTask();
+    return (_type == Task::Type::First) ? this : getPrevTask()->getFirstTask();
 }
 
 inline
 CoroTaskPtr CoroTask::getErrorHandlerOrFinalTask()
 {
-    if ((_type == Task::Type::ErrorHandler) || (_type == Task::Type::Final))
-    {
-        return shared_from_this();
-    }
-    else if (_next)
-    {
-        CoroTaskPtr task = _next->getErrorHandlerOrFinalTask();
-        if ((_next->getType() != Task::Type::ErrorHandler) && (_next->getType() != Task::Type::Final))
-        {
-            _next->terminate();
-            _next.reset(); //release next task
+    if (_next) {
+        if ((_next->getType() == Task::Type::ErrorHandler) ||
+            (_next->getType() == Task::Type::Final)) {
+            return std::move(_next);
         }
-        return task;
+        CoroTaskPtr next = _next->getErrorHandlerOrFinalTask();
+        _next.reset();
+        return next;
     }
-    return nullptr;
+    return std::move(_next);
 }
 
 inline
